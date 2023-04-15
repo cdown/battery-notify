@@ -2,6 +2,3 @@
 name = "battery-notify"
 version = "0.1.0"
 edition = "2021"
-
-[dependencies]
-num_enum = "0.6.1"

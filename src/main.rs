@@ -1,11 +1,10 @@
-use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::convert::TryFrom;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::cell::Cell;
 
-static LAST_BATTERY_STATE: AtomicU8 = AtomicU8::new(0);
+thread_local! {
+    static LAST_BATTERY_STATE: Cell<BatteryState> = Cell::new(BatteryState::Unknown);
+}
 
-#[derive(Debug, Eq, PartialEq, IntoPrimitive, TryFromPrimitive)]
-#[repr(u8)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 enum BatteryState {
     Discharging,
     Charging,
@@ -15,12 +14,11 @@ enum BatteryState {
 }
 
 fn set_last_state(state: BatteryState) {
-    LAST_BATTERY_STATE.store(state.into(), Ordering::Release);
+    LAST_BATTERY_STATE.with(|lbs| lbs.set(state));
 }
 
 fn get_last_state() -> BatteryState {
-    BatteryState::try_from(LAST_BATTERY_STATE.load(Ordering::Acquire))
-        .expect("LAST_BATTERY_STATE is corrupt")
+    LAST_BATTERY_STATE.with(Cell::get)
 }
 
 fn main() {
