@@ -154,6 +154,8 @@ fn main() -> Result<()> {
     let mut last_state = BatteryState::Invalid;
     let mut state_notif = SingleNotification::new();
     let mut low_notif = SingleNotification::new();
+    let sleep_backoff = Duration::from_secs(60);
+    let mut last_sleep_epoch = Instant::now() - sleep_backoff;
 
     loop {
         let start = Instant::now();
@@ -178,7 +180,11 @@ fn main() -> Result<()> {
 
         if global.capacity_pct <= cfg.sleep_pct && global.state != BatteryState::Charging {
             low_notif.show_once("Battery critical", Urgency::Critical);
-            mem_sleep(&cfg.sleep_command);
+            // Just in case we've gone loco, don't do this more than once a minute
+            if last_sleep_epoch < start - sleep_backoff {
+                last_sleep_epoch = start;
+                mem_sleep(&cfg.sleep_command);
+            }
         } else if global.capacity_pct <= cfg.low_pct {
             low_notif.show_once("Battery low", Urgency::Normal);
         } else {
