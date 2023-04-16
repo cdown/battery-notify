@@ -1,12 +1,9 @@
-use anyhow::Result;
-use std::cell::Cell;
+use anyhow::{bail, Context, Result};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
-
-thread_local! {
-    static LAST_BATTERY_STATE: Cell<BatteryState> = Cell::new(BatteryState::Unknown);
-}
+use std::thread::sleep;
+use std::time::Duration;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 enum BatteryState {
@@ -15,6 +12,7 @@ enum BatteryState {
     NotCharging,
     Full,
     Unknown,
+    Invalid,
 }
 
 #[derive(Debug)]
@@ -24,14 +22,6 @@ struct Battery {
     // Unitless, may either come from charge_* or energy_* since we just use it for percentage
     full: u64,
     now: u64,
-}
-
-fn set_last_state(state: BatteryState) {
-    LAST_BATTERY_STATE.with(|lbs| lbs.set(state));
-}
-
-fn get_last_state() -> BatteryState {
-    LAST_BATTERY_STATE.with(Cell::get)
 }
 
 fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
@@ -86,6 +76,45 @@ fn get_batteries() -> Result<Vec<Battery>> {
         .collect::<Vec<Battery>>())
 }
 
-fn main() {
-    dbg!(get_batteries().unwrap());
+fn get_state(batteries: Vec<Battery>) -> BatteryState {
+    if batteries.iter().any(|b| b.state == BatteryState::Charging) {
+        return BatteryState::Charging;
+    }
+    if batteries
+        .iter()
+        .any(|b| b.state == BatteryState::Discharging)
+    {
+        return BatteryState::Discharging;
+    }
+    if batteries.iter().all(|b| b.state == BatteryState::Full) {
+        return BatteryState::Full;
+    }
+    if batteries.iter().all(|b| {
+        b.state == BatteryState::Unknown
+            || b.state == BatteryState::NotCharging
+            || b.state == BatteryState::Full
+    }) {
+        // Confusingly some laptops set "Unknown" instead of "Not charging" when at threshold
+        return BatteryState::NotCharging;
+    }
+    BatteryState::Discharging
+}
+
+fn main() -> Result<()> {
+    let mut last_state = BatteryState::Invalid;
+
+    loop {
+        let batteries = get_batteries().context("failed to get list of batteries")?;
+        if batteries.is_empty() {
+            bail!("no batteries detected");
+        }
+        let state = get_state(batteries);
+
+        if state != last_state {
+            println!("State transition: {last_state:?} -> {state:?}");
+            last_state = state;
+        }
+
+        sleep(Duration::from_millis(500));
+    }
 }
