@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 enum BatteryState {
@@ -90,24 +90,30 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
 }
 
 fn main() -> Result<()> {
+    let interval = Duration::from_millis(500);
     let mut last_state = BatteryState::Invalid;
 
     loop {
+        let start = Instant::now();
         let batteries = get_batteries().context("failed to get list of batteries")?;
+
         if batteries.is_empty() {
             bail!("no batteries detected");
         }
-        let global = get_global_battery(&batteries);
 
+        let global = get_global_battery(&batteries);
         if global.state != last_state {
             println!("State transition: {last_state:?} -> {:?}", global.state);
             last_state = global.state;
         }
-
         if global.capacity_pct <= 15 {
             println!("Would warn for percentage {}", global.capacity_pct);
         }
 
-        sleep(Duration::from_millis(500));
+        let elapsed = start.elapsed();
+
+        if elapsed < interval {
+            sleep(interval - elapsed);
+        }
     }
 }
