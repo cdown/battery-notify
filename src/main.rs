@@ -191,7 +191,7 @@ fn main() -> Result<()> {
                     mem_sleep(&cfg.sleep_command);
                 }
             } else if global.capacity_pct <= cfg.low_pct {
-                low_notif.show_once_for_summary("Battery low".to_string(), Urgency::Normal);
+                low_notif.show_once_for_summary("Battery low".to_string(), Urgency::Critical);
             }
         } else {
             low_notif.close();
