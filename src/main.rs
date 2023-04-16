@@ -26,6 +26,7 @@ struct Battery {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(default)]
 struct Config {
     sleep_command: String,
     interval_secs: u64,
