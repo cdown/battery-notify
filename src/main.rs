@@ -70,7 +70,7 @@ impl SingleNotification {
                 .summary(&self.summary)
                 .urgency(urgency)
                 .show()
-                .map_err(|err| eprintln!("error showing notification: {}", err))
+                .map_err(|err| eprintln!("error showing notification: {err}"))
                 .ok();
         }
     }
