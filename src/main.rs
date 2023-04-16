@@ -46,15 +46,20 @@ impl Default for Config {
 
 struct SingleNotification {
     hnd: Option<NotificationHandle>,
+    urgency: Option<Urgency>,
 }
 
 impl SingleNotification {
     fn new() -> Self {
-        Self { hnd: None }
+        Self {
+            hnd: None,
+            urgency: None,
+        }
     }
 
     fn show(&mut self, summary: &str, urgency: Urgency) {
         self.close();
+        self.urgency = Some(urgency);
         self.hnd = Notification::new()
             .summary(summary)
             .urgency(urgency)
@@ -69,8 +74,8 @@ impl SingleNotification {
         }
     }
 
-    fn show_once(&mut self, summary: &str, urgency: Urgency) {
-        if self.hnd.is_none() {
+    fn show_once_for_urgency(&mut self, summary: &str, urgency: Urgency) {
+        if self.urgency != Some(urgency) {
             self.show(summary, urgency)
         }
     }
@@ -167,7 +172,6 @@ fn main() -> Result<()> {
 
         let global = get_global_battery(&batteries);
         if global.state != last_state {
-            println!("State transition: {last_state:?} -> {:?}", global.state);
             state_notif.show(
                 &format!(
                     "Battery now {}",
@@ -180,14 +184,14 @@ fn main() -> Result<()> {
 
         if global.state != BatteryState::Charging {
             if global.capacity_pct <= cfg.sleep_pct {
-                low_notif.show_once("Battery critical", Urgency::Critical);
+                low_notif.show_once_for_urgency("Battery critical", Urgency::Critical);
                 // Just in case we've gone loco, don't do this more than once a minute
                 if last_sleep_epoch < start - sleep_backoff {
                     last_sleep_epoch = start;
                     mem_sleep(&cfg.sleep_command);
                 }
             } else if global.capacity_pct <= cfg.low_pct {
-                low_notif.show_once("Battery low", Urgency::Normal);
+                low_notif.show_once_for_urgency("Battery low", Urgency::Normal);
             }
         } else {
             low_notif.close();
