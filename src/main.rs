@@ -46,22 +46,22 @@ impl Default for Config {
 
 struct SingleNotification {
     hnd: Option<NotificationHandle>,
-    urgency: Option<Urgency>,
+    summary: String,
 }
 
 impl SingleNotification {
     fn new() -> Self {
         Self {
             hnd: None,
-            urgency: None,
+            summary: "".to_string(),
         }
     }
 
-    fn show(&mut self, summary: &str, urgency: Urgency) {
+    fn show(&mut self, summary: String, urgency: Urgency) {
         self.close();
-        self.urgency = Some(urgency);
+        self.summary = summary;
         self.hnd = Notification::new()
-            .summary(summary)
+            .summary(&self.summary)
             .urgency(urgency)
             .show()
             .map_err(|err| eprintln!("error showing notification: {}", err))
@@ -74,8 +74,8 @@ impl SingleNotification {
         }
     }
 
-    fn show_once_for_urgency(&mut self, summary: &str, urgency: Urgency) {
-        if self.urgency != Some(urgency) {
+    fn show_once_for_summary(&mut self, summary: String, urgency: Urgency) {
+        if self.summary != summary {
             self.show(summary, urgency)
         }
     }
@@ -173,7 +173,7 @@ fn main() -> Result<()> {
         let global = get_global_battery(&batteries);
         if global.state != last_state {
             state_notif.show(
-                &format!(
+                format!(
                     "Battery now {}",
                     battery_state_to_name(global.state).to_lowercase()
                 ),
@@ -184,14 +184,14 @@ fn main() -> Result<()> {
 
         if global.state != BatteryState::Charging {
             if global.capacity_pct <= cfg.sleep_pct {
-                low_notif.show_once_for_urgency("Battery critical", Urgency::Critical);
+                low_notif.show_once_for_summary("Battery critical".to_string(), Urgency::Critical);
                 // Just in case we've gone loco, don't do this more than once a minute
                 if last_sleep_epoch < start - sleep_backoff {
                     last_sleep_epoch = start;
                     mem_sleep(&cfg.sleep_command);
                 }
             } else if global.capacity_pct <= cfg.low_pct {
-                low_notif.show_once_for_urgency("Battery low", Urgency::Normal);
+                low_notif.show_once_for_summary("Battery low".to_string(), Urgency::Normal);
             }
         } else {
             low_notif.close();
