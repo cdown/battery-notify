@@ -7,6 +7,8 @@ use std::path::Path;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use x11rb::connection::Connection;
+use x11rb::protocol::randr;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 enum BatteryState {
@@ -32,6 +34,7 @@ struct Config {
     interval_secs: u64,
     sleep_pct: u8,
     low_pct: u8,
+    warn_on_mons_with_no_ac: usize,
 }
 
 impl Default for Config {
@@ -41,6 +44,7 @@ impl Default for Config {
             interval_secs: 30,
             sleep_pct: 15,
             low_pct: 40,
+            warn_on_mons_with_no_ac: 2,
         }
     }
 }
@@ -106,6 +110,21 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
     })
 }
 
+fn get_nr_connected_monitors() -> Result<usize> {
+    let (conn, screen_num) = x11rb::connect(None)?;
+    let root = conn.setup().roots[screen_num].root;
+    let resources = randr::get_screen_resources(&conn, root)?;
+
+    let mut nr_connected_monitors = 0;
+    for output in resources.reply()?.outputs.iter() {
+        let output_info = randr::get_output_info(&conn, *output, 0)?.reply()?;
+        if let randr::Connection::CONNECTED = output_info.connection {
+            nr_connected_monitors += 1;
+        }
+    }
+    Ok(nr_connected_monitors)
+}
+
 fn get_batteries() -> Result<Vec<Battery>> {
     Ok(fs::read_dir("/sys/class/power_supply")?
         .filter_map(std::result::Result::ok)
@@ -160,6 +179,7 @@ fn main() -> Result<()> {
     let mut last_state = BatteryState::Invalid;
     let mut state_notif = SingleNotification::new();
     let mut low_notif = SingleNotification::new();
+    let mut mon_notif = SingleNotification::new();
     let sleep_backoff = Duration::from_secs(60);
     let mut last_sleep_epoch = Instant::now() - sleep_backoff;
 
@@ -202,6 +222,21 @@ fn main() -> Result<()> {
             }
         } else {
             low_notif.close();
+        }
+
+        if cfg.warn_on_mons_with_no_ac > 0
+            && global.state == BatteryState::Discharging
+            && get_nr_connected_monitors().unwrap_or(0) >= cfg.warn_on_mons_with_no_ac
+        {
+            mon_notif.show_once_for_summary(
+                format!(
+                    "Connected to {} monitors but not AC",
+                    cfg.warn_on_mons_with_no_ac
+                ),
+                Urgency::Critical,
+            );
+        } else {
+            mon_notif.close();
         }
 
         let elapsed = start.elapsed();
