@@ -18,6 +18,10 @@ enum BatteryState {
     NotCharging,
     Full,
     Unknown,
+
+    // These are internal values -- they never come from sysfs
+    #[serde(rename = "At threshold")]
+    AtThreshold,
     Invalid,
 }
 
@@ -195,10 +199,16 @@ fn main() -> Result<()> {
 
         let global = get_global_battery(&batteries);
         if global.state != last_state {
+            let state = if global.state == BatteryState::NotCharging {
+                // "not charging" is somewhat confusing, it just means we hit charging thresh
+                BatteryState::AtThreshold
+            } else {
+                global.state
+            };
             state_notif.show(
                 format!(
                     "Battery now {}",
-                    battery_state_to_name(global.state).to_lowercase()
+                    battery_state_to_name(state).to_lowercase()
                 ),
                 Urgency::Normal,
             );
