@@ -62,7 +62,7 @@ fn get_batteries() -> Result<Vec<Battery>> {
         .collect::<Vec<Battery>>())
 }
 
-fn get_global_battery(batteries: Vec<Battery>) -> Battery {
+fn get_global_battery(batteries: &[Battery]) -> Battery {
     let state = if batteries.iter().any(|b| b.state == BatteryState::Charging) {
         BatteryState::Charging
     } else if batteries
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
         if batteries.is_empty() {
             bail!("no batteries detected");
         }
-        let global = get_global_battery(batteries);
+        let global = get_global_battery(&batteries);
 
         if global.state != last_state {
             println!("State transition: {last_state:?} -> {:?}", global.state);
