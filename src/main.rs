@@ -63,25 +63,21 @@ impl SingleNotification {
     }
 
     fn show(&mut self, summary: String, urgency: Urgency) {
-        self.close();
-        self.summary = summary;
-        self.hnd = Notification::new()
-            .summary(&self.summary)
-            .urgency(urgency)
-            .show()
-            .map_err(|err| eprintln!("error showing notification: {}", err))
-            .ok();
+        if self.summary != summary {
+            self.close();
+            self.summary = summary;
+            self.hnd = Notification::new()
+                .summary(&self.summary)
+                .urgency(urgency)
+                .show()
+                .map_err(|err| eprintln!("error showing notification: {}", err))
+                .ok();
+        }
     }
 
     fn close(&mut self) {
         if let Some(hnd) = self.hnd.take() {
             hnd.close();
-        }
-    }
-
-    fn show_once_for_summary(&mut self, summary: String, urgency: Urgency) {
-        if self.summary != summary {
-            self.show(summary, urgency)
         }
     }
 }
@@ -211,14 +207,14 @@ fn main() -> Result<()> {
 
         if global.state != BatteryState::Charging {
             if global.capacity_pct <= cfg.sleep_pct {
-                low_notif.show_once_for_summary("Battery critical".to_string(), Urgency::Critical);
+                low_notif.show("Battery critical".to_string(), Urgency::Critical);
                 // Just in case we've gone loco, don't do this more than once a minute
                 if last_sleep_epoch < start - sleep_backoff {
                     last_sleep_epoch = start;
                     mem_sleep(&cfg.sleep_command);
                 }
             } else if global.capacity_pct <= cfg.low_pct {
-                low_notif.show_once_for_summary("Battery low".to_string(), Urgency::Critical);
+                low_notif.show("Battery low".to_string(), Urgency::Critical);
             }
         } else {
             low_notif.close();
@@ -228,7 +224,7 @@ fn main() -> Result<()> {
             && global.state == BatteryState::Discharging
             && get_nr_connected_monitors().unwrap_or(0) >= cfg.warn_on_mons_with_no_ac
         {
-            mon_notif.show_once_for_summary(
+            mon_notif.show(
                 format!(
                     "Connected to {} monitors but not AC",
                     cfg.warn_on_mons_with_no_ac

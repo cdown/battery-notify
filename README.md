@@ -11,6 +11,7 @@ changes to system battery state.
 
 - Small, easy to understand codebase
 - Notifications on battery state change
+- Works with multiple batteries
 - Warnings on low/critical battery percentages
 - Warnings when connected to a monitor but not mains power
 - Ability to sleep the computer with a custom command on critical percentage
