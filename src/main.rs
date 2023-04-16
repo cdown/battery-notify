@@ -18,10 +18,7 @@ enum BatteryState {
 #[derive(Debug)]
 struct Battery {
     state: BatteryState,
-
-    // Unitless, may either come from charge_* or energy_* since we just use it for percentage
-    full: u64,
-    now: u64,
+    capacity_pct: u8,
 }
 
 fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
@@ -30,16 +27,6 @@ fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
         content.truncate(idx);
     }
     Ok(content)
-}
-
-/// Some drivers expose coloumb counter (charge), some drivers expose µWh (energy), some drivers
-/// expose both. We only care about the percentage.
-fn read_battery_file_energy_or_charge(dir: &Path, partial_file: &str) -> Result<String> {
-    let energy = read_battery_file(dir, "energy".to_owned() + partial_file);
-    if energy.is_ok() {
-        return energy;
-    }
-    read_battery_file(dir, "charge".to_owned() + partial_file)
 }
 
 fn name_to_battery_state(name: &str) -> BatteryState {
@@ -56,8 +43,7 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
     let dir = dir.as_ref();
     Ok(Battery {
         state: name_to_battery_state(&read_battery_file(dir, "status")?),
-        full: read_battery_file_energy_or_charge(dir, "_full")?.parse()?,
-        now: read_battery_file_energy_or_charge(dir, "_now")?.parse()?,
+        capacity_pct: read_battery_file(dir, "capacity")?.parse()?,
     })
 }
 
@@ -101,8 +87,7 @@ fn get_global_battery(batteries: Vec<Battery>) -> Battery {
 
     Battery {
         state,
-        full: batteries.iter().map(|b| b.full).sum(),
-        now: batteries.iter().map(|b| b.now).sum(),
+        capacity_pct: batteries.iter().map(|b| b.capacity_pct).sum(),
     }
 }
 
@@ -121,10 +106,8 @@ fn main() -> Result<()> {
             last_state = global.state;
         }
 
-        let perc = global.now * 100 / global.full;
-
-        if perc <= 15 {
-            println!("Would warn for percentage {perc}");
+        if global.capacity_pct <= 15 {
+            println!("Would warn for percentage {}", global.capacity_pct);
         }
 
         sleep(Duration::from_millis(500));
