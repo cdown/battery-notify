@@ -1,14 +1,17 @@
 use anyhow::{bail, Context, Result};
+use notify_rust::{Notification, NotificationHandle};
+use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 enum BatteryState {
     Discharging,
     Charging,
+    #[serde(rename = "Not charging")]
     NotCharging,
     Full,
     Unknown,
@@ -21,6 +24,31 @@ struct Battery {
     capacity_pct: u8,
 }
 
+struct SingleNotification {
+    hnd: Option<NotificationHandle>,
+}
+
+impl SingleNotification {
+    fn new() -> Self {
+        Self { hnd: None }
+    }
+
+    fn show(&mut self, summary: &str) {
+        self.close();
+        self.hnd = Notification::new()
+            .summary(summary)
+            .show()
+            .map_err(|err| eprintln!("error showing notification: {}", err))
+            .ok();
+    }
+
+    fn close(&mut self) {
+        if let Some(hnd) = self.hnd.take() {
+            hnd.close();
+        }
+    }
+}
+
 fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
     let mut content = fs::read_to_string(dir.join(file.as_ref()))?;
     if let Some(idx) = content.find('\n') {
@@ -30,13 +58,11 @@ fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
 }
 
 fn name_to_battery_state(name: &str) -> BatteryState {
-    match name {
-        "Charging" => BatteryState::Charging,
-        "Discharging" => BatteryState::Discharging,
-        "Not charging" => BatteryState::NotCharging,
-        "Full" => BatteryState::Full,
-        _ => BatteryState::Unknown,
-    }
+    serde_plain::from_str(name).unwrap()
+}
+
+fn battery_state_to_name(state: BatteryState) -> String {
+    serde_plain::to_string(&state).unwrap()
 }
 
 fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
@@ -92,6 +118,7 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
 fn main() -> Result<()> {
     let interval = Duration::from_millis(500);
     let mut last_state = BatteryState::Invalid;
+    let mut notif = SingleNotification::new();
 
     loop {
         let start = Instant::now();
@@ -104,9 +131,13 @@ fn main() -> Result<()> {
         let global = get_global_battery(&batteries);
         if global.state != last_state {
             println!("State transition: {last_state:?} -> {:?}", global.state);
+            notif.show(&format!(
+                "Battery now {}",
+                battery_state_to_name(global.state).to_lowercase()
+            ));
             last_state = global.state;
         }
-        if global.capacity_pct <= 15 {
+        if global.capacity_pct <= 85 {
             println!("Would warn for percentage {}", global.capacity_pct);
         }
 
