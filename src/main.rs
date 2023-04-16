@@ -63,27 +63,25 @@ fn get_batteries() -> Result<Vec<Battery>> {
 }
 
 fn get_global_battery(batteries: Vec<Battery>) -> Battery {
-    let mut state = BatteryState::Discharging;
-    if batteries.iter().any(|b| b.state == BatteryState::Charging) {
-        state = BatteryState::Charging;
-    }
-    if batteries
+    let state = if batteries.iter().any(|b| b.state == BatteryState::Charging) {
+        BatteryState::Charging
+    } else if batteries
         .iter()
         .any(|b| b.state == BatteryState::Discharging)
     {
-        state = BatteryState::Discharging;
-    }
-    if batteries.iter().all(|b| b.state == BatteryState::Full) {
-        state = BatteryState::Full;
-    }
-    if batteries.iter().all(|b| {
+        BatteryState::Discharging
+    } else if batteries.iter().all(|b| b.state == BatteryState::Full) {
+        BatteryState::Full
+    } else if batteries.iter().all(|b| {
         b.state == BatteryState::Unknown
             || b.state == BatteryState::NotCharging
             || b.state == BatteryState::Full
     }) {
         // Confusingly some laptops set "Unknown" instead of "Not charging" when at threshold
-        state = BatteryState::NotCharging;
-    }
+        BatteryState::NotCharging
+    } else {
+        BatteryState::Discharging
+    };
 
     Battery {
         state,
