@@ -178,15 +178,17 @@ fn main() -> Result<()> {
             last_state = global.state;
         }
 
-        if global.capacity_pct <= cfg.sleep_pct && global.state != BatteryState::Charging {
-            low_notif.show_once("Battery critical", Urgency::Critical);
-            // Just in case we've gone loco, don't do this more than once a minute
-            if last_sleep_epoch < start - sleep_backoff {
-                last_sleep_epoch = start;
-                mem_sleep(&cfg.sleep_command);
+        if global.state != BatteryState::Charging {
+            if global.capacity_pct <= cfg.sleep_pct {
+                low_notif.show_once("Battery critical", Urgency::Critical);
+                // Just in case we've gone loco, don't do this more than once a minute
+                if last_sleep_epoch < start - sleep_backoff {
+                    last_sleep_epoch = start;
+                    mem_sleep(&cfg.sleep_command);
+                }
+            } else if global.capacity_pct <= cfg.low_pct {
+                low_notif.show_once("Battery low", Urgency::Normal);
             }
-        } else if global.capacity_pct <= cfg.low_pct {
-            low_notif.show_once("Battery low", Urgency::Normal);
         } else {
             low_notif.close();
         }
