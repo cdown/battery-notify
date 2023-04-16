@@ -49,7 +49,7 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
 
 fn get_batteries() -> Result<Vec<Battery>> {
     Ok(fs::read_dir("/sys/class/power_supply")?
-        .filter_map(|e| e.ok())
+        .filter_map(std::result::Result::ok)
         .map(|e| e.path())
         .filter(|p| {
             p.file_name()
@@ -58,7 +58,7 @@ fn get_batteries() -> Result<Vec<Battery>> {
                 .starts_with("BAT")
         })
         .map(read_battery_dir)
-        .filter_map(|b| b.ok())
+        .filter_map(std::result::Result::ok)
         .collect::<Vec<Battery>>())
 }
 
