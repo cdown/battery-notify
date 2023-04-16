@@ -76,18 +76,19 @@ fn get_batteries() -> Result<Vec<Battery>> {
         .collect::<Vec<Battery>>())
 }
 
-fn get_state(batteries: Vec<Battery>) -> BatteryState {
+fn get_global_battery(batteries: Vec<Battery>) -> Battery {
+    let mut state = BatteryState::Discharging;
     if batteries.iter().any(|b| b.state == BatteryState::Charging) {
-        return BatteryState::Charging;
+        state = BatteryState::Charging;
     }
     if batteries
         .iter()
         .any(|b| b.state == BatteryState::Discharging)
     {
-        return BatteryState::Discharging;
+        state = BatteryState::Discharging;
     }
     if batteries.iter().all(|b| b.state == BatteryState::Full) {
-        return BatteryState::Full;
+        state = BatteryState::Full;
     }
     if batteries.iter().all(|b| {
         b.state == BatteryState::Unknown
@@ -95,9 +96,14 @@ fn get_state(batteries: Vec<Battery>) -> BatteryState {
             || b.state == BatteryState::Full
     }) {
         // Confusingly some laptops set "Unknown" instead of "Not charging" when at threshold
-        return BatteryState::NotCharging;
+        state = BatteryState::NotCharging;
     }
-    BatteryState::Discharging
+
+    Battery {
+        state,
+        full: batteries.iter().map(|b| b.full).sum(),
+        now: batteries.iter().map(|b| b.now).sum(),
+    }
 }
 
 fn main() -> Result<()> {
@@ -108,11 +114,17 @@ fn main() -> Result<()> {
         if batteries.is_empty() {
             bail!("no batteries detected");
         }
-        let state = get_state(batteries);
+        let global = get_global_battery(batteries);
 
-        if state != last_state {
-            println!("State transition: {last_state:?} -> {state:?}");
-            last_state = state;
+        if global.state != last_state {
+            println!("State transition: {last_state:?} -> {:?}", global.state);
+            last_state = global.state;
+        }
+
+        let perc = global.now * 100 / global.full;
+
+        if perc <= 15 {
+            println!("Would warn for percentage {perc}");
         }
 
         sleep(Duration::from_millis(500));
