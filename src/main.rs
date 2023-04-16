@@ -55,10 +55,10 @@ struct SingleNotification {
 }
 
 impl SingleNotification {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             hnd: None,
-            summary: "".to_string(),
+            summary: String::new(),
         }
     }
 
