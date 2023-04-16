@@ -154,13 +154,19 @@ fn mem_sleep(cmd: &str) {
 }
 
 fn main() -> Result<()> {
-    let cfg: Config = confy::load("battery-notify", None)?;
+    let cfg: Config = confy::load("battery-notify", "config")?;
     let interval = Duration::from_secs(cfg.interval_secs);
     let mut last_state = BatteryState::Invalid;
     let mut state_notif = SingleNotification::new();
     let mut low_notif = SingleNotification::new();
     let sleep_backoff = Duration::from_secs(60);
     let mut last_sleep_epoch = Instant::now() - sleep_backoff;
+
+    println!(
+        "Config (overrideable at {}):\n\n{:#?}\n",
+        confy::get_configuration_file_path("battery-notify", "config")?.display(),
+        cfg
+    );
 
     loop {
         let start = Instant::now();
