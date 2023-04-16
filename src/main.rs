@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use notify_rust::{Notification, NotificationHandle};
+use notify_rust::{Notification, NotificationHandle, Urgency};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
@@ -33,10 +33,11 @@ impl SingleNotification {
         Self { hnd: None }
     }
 
-    fn show(&mut self, summary: &str) {
+    fn show(&mut self, summary: &str, urgency: Urgency) {
         self.close();
         self.hnd = Notification::new()
             .summary(summary)
+            .urgency(urgency)
             .show()
             .map_err(|err| eprintln!("error showing notification: {}", err))
             .ok();
@@ -45,6 +46,12 @@ impl SingleNotification {
     fn close(&mut self) {
         if let Some(hnd) = self.hnd.take() {
             hnd.close();
+        }
+    }
+
+    fn show_once(&mut self, summary: &str, urgency: Urgency) {
+        if self.hnd.is_none() {
+            self.show(summary, urgency)
         }
     }
 }
@@ -115,10 +122,17 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
     }
 }
 
+fn mem_sleep() {
+    if let Err(err) = fs::write("/sys/power/state", "mem") {
+        eprintln!("Failed to write \"mem\" to /sys/power/state: {err}");
+    }
+}
+
 fn main() -> Result<()> {
-    let interval = Duration::from_millis(500);
+    let interval = Duration::from_millis(5000);
     let mut last_state = BatteryState::Invalid;
-    let mut notif = SingleNotification::new();
+    let mut state_notif = SingleNotification::new();
+    let mut low_notif = SingleNotification::new();
 
     loop {
         let start = Instant::now();
@@ -131,14 +145,23 @@ fn main() -> Result<()> {
         let global = get_global_battery(&batteries);
         if global.state != last_state {
             println!("State transition: {last_state:?} -> {:?}", global.state);
-            notif.show(&format!(
-                "Battery now {}",
-                battery_state_to_name(global.state).to_lowercase()
-            ));
+            state_notif.show(
+                &format!(
+                    "Battery now {}",
+                    battery_state_to_name(global.state).to_lowercase()
+                ),
+                Urgency::Normal,
+            );
             last_state = global.state;
         }
-        if global.capacity_pct <= 85 {
-            println!("Would warn for percentage {}", global.capacity_pct);
+
+        if global.capacity_pct <= 15 && global.state != BatteryState::Charging {
+            low_notif.show_once("Battery critical", Urgency::Critical);
+            mem_sleep();
+        } else if global.capacity_pct <= 40 {
+            low_notif.show_once("Battery low", Urgency::Normal);
+        } else {
+            low_notif.close();
         }
 
         let elapsed = start.elapsed();
