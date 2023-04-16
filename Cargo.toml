@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.70"
+confy = "0.5.1"
 notify-rust = "4.8.0"
 serde = { version = "1.0.160", features = ["derive"] }
 serde_plain = "1.0.1"

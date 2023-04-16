@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -22,6 +23,25 @@ enum BatteryState {
 struct Battery {
     state: BatteryState,
     capacity_pct: u8,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    sleep_command: String,
+    interval_secs: u64,
+    sleep_pct: u8,
+    low_pct: u8,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            sleep_command: "printf mem > /sys/class/power".to_string(),
+            interval_secs: 30,
+            sleep_pct: 15,
+            low_pct: 40,
+        }
+    }
 }
 
 struct SingleNotification {
@@ -122,14 +142,15 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
     }
 }
 
-fn mem_sleep() {
-    if let Err(err) = fs::write("/sys/power/state", "mem") {
-        eprintln!("Failed to write \"mem\" to /sys/power/state: {err}");
+fn mem_sleep(cmd: &str) {
+    if let Err(err) = Command::new("sh").args(["-c", cmd]).status() {
+        eprintln!("Failed to run sleep command '{cmd}': {err}");
     }
 }
 
 fn main() -> Result<()> {
-    let interval = Duration::from_millis(5000);
+    let cfg: Config = confy::load("battery-notify", None)?;
+    let interval = Duration::from_secs(cfg.interval_secs);
     let mut last_state = BatteryState::Invalid;
     let mut state_notif = SingleNotification::new();
     let mut low_notif = SingleNotification::new();
@@ -155,10 +176,10 @@ fn main() -> Result<()> {
             last_state = global.state;
         }
 
-        if global.capacity_pct <= 15 && global.state != BatteryState::Charging {
+        if global.capacity_pct <= cfg.sleep_pct && global.state != BatteryState::Charging {
             low_notif.show_once("Battery critical", Urgency::Critical);
-            mem_sleep();
-        } else if global.capacity_pct <= 40 {
+            mem_sleep(&cfg.sleep_command);
+        } else if global.capacity_pct <= cfg.low_pct {
             low_notif.show_once("Battery low", Urgency::Normal);
         } else {
             low_notif.close();
