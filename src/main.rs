@@ -180,7 +180,7 @@ fn main() -> Result<()> {
     let mut last_sleep_epoch = Instant::now() - sleep_backoff;
 
     println!(
-        "Config (overrideable at {}):\n\n{:#?}\n",
+        "Config (configurable at {}):\n\n{:#?}\n",
         confy::get_configuration_file_path("battery-notify", "config")?.display(),
         cfg
     );
