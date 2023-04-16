@@ -112,9 +112,9 @@ fn get_nr_connected_monitors() -> Result<usize> {
     let resources = randr::get_screen_resources(&conn, root)?;
 
     let mut nr_connected_monitors = 0;
-    for output in resources.reply()?.outputs.iter() {
-        let output_info = randr::get_output_info(&conn, *output, 0)?.reply()?;
-        if let randr::Connection::CONNECTED = output_info.connection {
+    for output in resources.reply()?.outputs {
+        let output_info = randr::get_output_info(&conn, output, 0)?.reply()?;
+        if output_info.connection == randr::Connection::CONNECTED {
             nr_connected_monitors += 1;
         }
     }
