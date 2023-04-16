@@ -205,19 +205,17 @@ fn main() -> Result<()> {
             last_state = global.state;
         }
 
-        if global.state != BatteryState::Charging {
-            if global.capacity_pct <= cfg.sleep_pct {
-                low_notif.show("Battery critical".to_string(), Urgency::Critical);
-                // Just in case we've gone loco, don't do this more than once a minute
-                if last_sleep_epoch < start - sleep_backoff {
-                    last_sleep_epoch = start;
-                    mem_sleep(&cfg.sleep_command);
-                }
-            } else if global.capacity_pct <= cfg.low_pct {
-                low_notif.show("Battery low".to_string(), Urgency::Critical);
-            }
-        } else {
+        if global.state == BatteryState::Charging {
             low_notif.close();
+        } else if global.capacity_pct <= cfg.sleep_pct {
+            low_notif.show("Battery critical".to_string(), Urgency::Critical);
+            // Just in case we've gone loco, don't do this more than once a minute
+            if last_sleep_epoch < start - sleep_backoff {
+                last_sleep_epoch = start;
+                mem_sleep(&cfg.sleep_command);
+            }
+        } else if global.capacity_pct <= cfg.low_pct {
+            low_notif.show("Battery low".to_string(), Urgency::Critical);
         }
 
         if cfg.warn_on_mons_with_no_ac > 0
