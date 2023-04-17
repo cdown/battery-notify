@@ -7,8 +7,6 @@ use std::path::Path;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use x11rb::connection::Connection;
-use x11rb::protocol::randr;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 enum BatteryState {
@@ -110,7 +108,10 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
     })
 }
 
+#[cfg(feature = "mons")]
 fn get_nr_connected_monitors() -> Result<usize> {
+    use x11rb::{connection::Connection, protocol::randr};
+
     let (conn, screen_num) = x11rb::connect(None)?;
     let root = conn.setup().roots[screen_num].root;
     let resources = randr::get_screen_resources(&conn, root)?;
@@ -123,6 +124,11 @@ fn get_nr_connected_monitors() -> Result<usize> {
         }
     }
     Ok(nr_connected_monitors)
+}
+
+#[cfg(not(feature = "mons"))]
+fn get_nr_connected_monitors() -> Result<usize> {
+    Ok(0)
 }
 
 fn get_batteries() -> Result<Vec<Battery>> {

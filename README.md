@@ -7,13 +7,16 @@ changes to system battery state.
 
     cargo install battery-notify
 
+If you don't want to use `warn_on_mons_with_no_ac`, you can compile with
+`--no-default-features` to avoid depending on x11rb.
+
 ## Features
 
 - Small, easy to understand codebase
 - Notifications on battery state change
 - Works with multiple batteries
 - Warnings on low/critical battery percentages
-- Warnings when connected to a monitor but not mains power
+- Warnings when connected to a monitor but not mains power (X11 only)
 - Ability to sleep the computer with a custom command on critical percentage
 
 ## Usage
