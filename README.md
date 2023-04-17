@@ -16,7 +16,7 @@ If you don't want to use `warn_on_mons_with_no_ac`, you can compile with
 - Notifications on battery state change
 - Works with multiple batteries
 - Warnings on low/critical battery percentages
-- Warnings when connected to a monitor but not mains power (X11 only)
+- Warnings when connected to an external monitor but not mains power (X11 only)
 - Ability to sleep the computer with a custom command on critical percentage
 
 ## Usage
@@ -49,7 +49,8 @@ sleep_pct = 15
 sleep_command = 'systemctl suspend'
 
 # If this many monitors are connected (that is, plugged in -- they can be off)
-# and we are discharging, show a warning.
+# and we are discharging, show a warning. Intended to avoid cases where power
+# is inadvertently disconnected at a desk.
 warn_on_mons_with_no_ac = 2
 ```
 
