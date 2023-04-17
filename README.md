@@ -44,8 +44,8 @@ low_pct = 40
 sleep_pct = 15
 
 # The command to run when sleeping. Bear in mind that if you run as an
-# unprivileged user, you'll likely need to consider elevation, either with
-# NOPASSWD or things like polkit.
+# unprivileged user, you may need to consider elevation, either with NOPASSWD
+# or things like polkit.
 sleep_command = 'systemctl suspend'
 
 # If this many monitors are connected (that is, plugged in -- they can be off)
