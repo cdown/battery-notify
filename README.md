@@ -1,4 +1,4 @@
-# battery-notify
+# battery-notify | [![Tests](https://img.shields.io/github/actions/workflow/status/cdown/battery-notify/ci.yml?branch=master)](https://github.com/cdown/battery-notify/actions?query=branch%3Amaster)
 
 battery-notify is a small, Linux-only program that sends notifications on
 changes to system battery state.
