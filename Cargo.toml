@@ -9,6 +9,7 @@ readme = "README.md"
 keywords = ["battery", "linux", "notify", "popup"]
 categories = ["command-line-utilities"]
 license = "MIT"
+rust-version = "1.60.0"
 
 [dependencies]
 anyhow = "1.0.70"
