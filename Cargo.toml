@@ -2,6 +2,13 @@
 name = "battery-notify"
 version = "0.1.0"
 edition = "2021"
+authors = ["Chris Down <chris@chrisdown.name>"]
+description = "A simple battery notifier for Linux."
+repository = "https://github.com/cdown/battery-notify"
+readme = "README.md"
+keywords = ["battery", "linux", "notify", "popup"]
+categories = ["command-line-utilities"]
+license = "MIT"
 
 [dependencies]
 anyhow = "1.0.70"
