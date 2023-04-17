@@ -46,7 +46,7 @@ sleep_pct = 15
 # The command to run when sleeping. Bear in mind that if you run as an
 # unprivileged user, you'll likely need to consider elevation, either with
 # NOPASSWD or things like polkit.
-sleep_command = 'printf mem > /sys/class/power'
+sleep_command = 'systemctl suspend'
 
 # If this many monitors are connected (that is, plugged in -- they can be off)
 # and we are discharging, show a warning.

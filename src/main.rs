@@ -42,7 +42,7 @@ struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            sleep_command: "printf mem > /sys/class/power".to_string(),
+            sleep_command: "systemctl suspend".to_string(),
             interval_secs: 30,
             sleep_pct: 15,
             low_pct: 40,
