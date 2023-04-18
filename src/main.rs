@@ -187,7 +187,7 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
     }
 }
 
-fn mem_sleep(cmd: &str) {
+fn run_sleep_command(cmd: &str) {
     if let Err(err) = Command::new("sh").args(["-c", cmd]).status() {
         eprintln!("Failed to run sleep command '{cmd}': {err}");
     }
@@ -251,7 +251,7 @@ fn main() -> Result<()> {
             // Just in case we've gone loco, don't do this more than once a minute
             if last_sleep_epoch < start - sleep_backoff {
                 last_sleep_epoch = start;
-                mem_sleep(&cfg.sleep_command);
+                run_sleep_command(&cfg.sleep_command);
             }
         } else if global.capacity_pct <= cfg.low_pct {
             low_notif.show("Battery low".to_string(), Urgency::Critical);
