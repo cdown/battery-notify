@@ -85,6 +85,12 @@ impl SingleNotification {
     }
 }
 
+impl Drop for SingleNotification {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
 fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
     let mut content = fs::read_to_string(dir.join(file.as_ref()))?;
     if let Some(idx) = content.find('\n') {
