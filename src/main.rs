@@ -1,6 +1,5 @@
 use anyhow::{bail, Context, Result};
 use notify_rust::{Notification, NotificationHandle, Urgency};
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
@@ -119,6 +118,7 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
 
 #[cfg(feature = "mons")]
 fn get_nr_connected_monitors() -> Result<usize> {
+    use once_cell::sync::Lazy;
     use x11rb::{connection::Connection, protocol::randr, rust_connection::RustConnection};
 
     static CONN_AND_ROOT: Lazy<(RustConnection, u32)> = Lazy::new(|| {
