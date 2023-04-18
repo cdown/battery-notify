@@ -6,7 +6,8 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::thread::sleep;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
@@ -200,6 +201,15 @@ fn main() -> Result<()> {
     let mut mon_notif = SingleNotification::new();
     let sleep_backoff = Duration::from_secs(60);
     let mut last_sleep_epoch = Instant::now() - sleep_backoff;
+    let should_term = Arc::new(AtomicBool::new(false));
+    let st_for_hnd = should_term.clone();
+    let (mut timer, canceller) = cancellable_timer::Timer::new2()?;
+
+    ctrlc::set_handler(move || {
+        st_for_hnd.store(true, Ordering::Relaxed);
+        canceller.cancel().unwrap();
+    })
+    .expect("Failed to set signal handler");
 
     println!(
         "Config (configurable at {}):\n\n{:#?}\n",
@@ -207,7 +217,7 @@ fn main() -> Result<()> {
         cfg
     );
 
-    loop {
+    while !should_term.load(Ordering::Relaxed) {
         let start = Instant::now();
         let batteries = get_batteries().context("failed to get list of batteries")?;
 
@@ -264,7 +274,9 @@ fn main() -> Result<()> {
         let elapsed = start.elapsed();
 
         if elapsed < interval {
-            sleep(interval - elapsed);
+            let _ = timer.sleep(interval - elapsed);
         }
     }
+
+    Ok(())
 }
