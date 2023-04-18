@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use notify_rust::{Notification, NotificationHandle, Urgency};
+use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
@@ -110,15 +111,20 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
 
 #[cfg(feature = "mons")]
 fn get_nr_connected_monitors() -> Result<usize> {
-    use x11rb::{connection::Connection, protocol::randr};
+    use x11rb::{connection::Connection, protocol::randr, rust_connection::RustConnection};
 
-    let (conn, screen_num) = x11rb::connect(None)?;
-    let root = conn.setup().roots[screen_num].root;
-    let resources = randr::get_screen_resources(&conn, root)?;
+    static CONN_AND_ROOT: Lazy<(RustConnection, u32)> = Lazy::new(|| {
+        let (conn, screen_num) = x11rb::connect(None).unwrap();
+        let root = conn.setup().roots[screen_num].root;
+        (conn, root)
+    });
+
+    let (conn, root) = Lazy::force(&CONN_AND_ROOT);
+    let resources = randr::get_screen_resources(conn, *root)?;
 
     let mut nr_connected_monitors = 0;
     for output in resources.reply()?.outputs {
-        let output_info = randr::get_output_info(&conn, output, 0)?.reply()?;
+        let output_info = randr::get_output_info(conn, output, 0)?.reply()?;
         if output_info.connection == randr::Connection::CONNECTED {
             nr_connected_monitors += 1;
         }

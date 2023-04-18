@@ -140,6 +140,7 @@ dependencies = [
  "anyhow",
  "confy",
  "notify-rust",
+ "once_cell",
  "serde",
  "serde_plain",
  "x11rb",
