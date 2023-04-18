@@ -4,6 +4,7 @@ use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
+use std::io;
 use std::path::Path;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -274,7 +275,10 @@ fn main() -> Result<()> {
         let elapsed = start.elapsed();
 
         if elapsed < interval {
-            let _ = timer.sleep(interval - elapsed);
+            match timer.sleep(interval - elapsed) {
+                Err(err) if err.kind() != io::ErrorKind::Interrupted => Err(err),
+                _ => Ok(()),
+            }?;
         }
     }
 
