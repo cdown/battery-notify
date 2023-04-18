@@ -208,7 +208,8 @@ fn main() -> Result<()> {
 
     ctrlc::set_handler(move || {
         st_for_hnd.store(true, Ordering::Relaxed);
-        canceller.cancel().unwrap();
+        // If we fail to cancel, we'll just do it at the next start of the loop
+        let _ = canceller.cancel();
     })
     .expect("Failed to set signal handler");
 
