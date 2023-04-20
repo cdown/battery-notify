@@ -28,7 +28,23 @@ enum BatteryState {
 #[derive(Debug)]
 struct Battery {
     state: BatteryState,
-    capacity_pct: u8,
+    now_uwh: u64,
+    full_uwh: u64,
+}
+
+impl Battery {
+    fn level(&self) -> Result<u8> {
+        let mut level = self
+            .now_uwh
+            .checked_mul(100)
+            .context("overflow")?
+            .checked_div(self.full_uwh)
+            .context("division by zero")?;
+        if level > 100 {
+            level = 100;
+        }
+        Ok(level.try_into().unwrap())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -108,11 +124,26 @@ fn battery_state_to_name(state: BatteryState) -> String {
     serde_plain::to_string(&state).unwrap()
 }
 
+/// Some drivers expose µAh (charge), some drivers expose µWh (energy), some drivers
+/// expose both. Normalise to µWh, since if it's available, it requires only reading one file.
+fn read_battery_file_energy_or_charge(dir: &Path, partial_file: &str) -> Result<u64> {
+    let uwh = read_battery_file(dir, "energy_".to_string() + partial_file);
+    if uwh.is_ok() {
+        return Ok(uwh?.parse()?);
+    }
+
+    let voltage: u64 = read_battery_file(dir, "voltage_now")?.parse()?;
+    let uah: u64 = read_battery_file(dir, "charge_".to_string() + partial_file)?.parse()?;
+    Ok((uah * voltage) / 1000)
+}
+
 fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
     let dir = dir.as_ref();
+
     Ok(Battery {
         state: name_to_battery_state(&read_battery_file(dir, "status")?),
-        capacity_pct: read_battery_file(dir, "capacity")?.parse()?,
+        now_uwh: read_battery_file_energy_or_charge(dir, "now")?,
+        full_uwh: read_battery_file_energy_or_charge(dir, "full")?,
     })
 }
 
@@ -183,7 +214,8 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
 
     Battery {
         state,
-        capacity_pct: batteries.iter().map(|b| b.capacity_pct).sum(),
+        now_uwh: batteries.iter().map(|b| b.now_uwh).sum(),
+        full_uwh: batteries.iter().map(|b| b.full_uwh).sum(),
     }
 }
 
@@ -245,16 +277,20 @@ fn main() -> Result<()> {
             last_state = global.state;
         }
 
+        let level = global.level()?;
+
+        println!("Current level: {level}");
+
         if global.state == BatteryState::Charging {
             low_notif.close();
-        } else if global.capacity_pct <= cfg.sleep_pct {
+        } else if level <= cfg.sleep_pct {
             low_notif.show("Battery critical".to_string(), Urgency::Critical);
             // Just in case we've gone loco, don't do this more than once a minute
             if last_sleep_epoch < start - sleep_backoff {
                 last_sleep_epoch = start;
                 run_sleep_command(&cfg.sleep_command);
             }
-        } else if global.capacity_pct <= cfg.low_pct {
+        } else if level <= cfg.low_pct {
             low_notif.show("Battery low".to_string(), Urgency::Critical);
         }
 
