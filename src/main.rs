@@ -227,7 +227,7 @@ fn main() -> Result<()> {
     let mut low_notif = SingleNotification::new();
     let mut mon_notif = SingleNotification::new();
     let sleep_backoff = Duration::from_secs(60);
-    let mut last_sleep_epoch = Instant::now() - sleep_backoff;
+    let mut last_sleep_epoch = None;
     let should_term = Arc::new(AtomicBool::new(false));
     let st_for_hnd = should_term.clone();
     let (mut timer, canceller) = cancellable_timer::Timer::new2()?;
@@ -280,8 +280,10 @@ fn main() -> Result<()> {
         } else if level <= cfg.sleep_pct {
             low_notif.show("Battery critical".to_string(), Urgency::Critical);
             // Just in case we've gone loco, don't do this more than once a minute
-            if last_sleep_epoch < start - sleep_backoff {
-                last_sleep_epoch = start;
+            if last_sleep_epoch.map_or(true, |l| {
+                start.checked_sub(sleep_backoff).map_or(false, |t| l < t)
+            }) {
+                last_sleep_epoch = Some(start);
                 run_sleep_command(&cfg.sleep_command);
             }
         } else if level <= cfg.low_pct {
