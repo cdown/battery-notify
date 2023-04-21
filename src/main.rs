@@ -34,12 +34,7 @@ struct Battery {
 
 impl Battery {
     fn level(&self) -> Result<u8> {
-        let mut level = self
-            .now_uwh
-            .checked_mul(100)
-            .context("overflow")?
-            .checked_div(self.full_uwh)
-            .context("division by zero")?;
+        let mut level = (self.now_uwh * 100) / self.full_uwh;
         if level > 100 {
             level = 100;
         }
