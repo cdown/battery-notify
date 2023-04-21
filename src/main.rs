@@ -33,7 +33,7 @@ struct Battery {
 }
 
 impl Battery {
-    fn level(&self) -> u8 {
+    const fn level(&self) -> u8 {
         let mut level = (self.now_uwh * 100) / self.full_uwh;
         if level > 100 {
             level = 100;
