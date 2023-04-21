@@ -119,8 +119,7 @@ fn battery_state_to_name(state: BatteryState) -> String {
     serde_plain::to_string(&state).unwrap()
 }
 
-/// Some drivers expose µAh (charge), some drivers expose µWh (energy), some drivers
-/// expose both. Normalise to µWh, since if it's available, it requires only reading one file.
+/// Some drivers expose µAh (charge), some drivers expose µWh (energy), some drivers expose both.
 fn read_battery_file_energy_or_charge(dir: &Path, partial_file: &str) -> Result<u64> {
     let uwh = read_battery_file(dir, "energy_".to_string() + partial_file);
     if uwh.is_ok() {
