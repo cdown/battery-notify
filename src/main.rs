@@ -33,12 +33,12 @@ struct Battery {
 }
 
 impl Battery {
-    fn level(&self) -> Result<u8> {
+    fn level(&self) -> u8 {
         let mut level = (self.now_uwh * 100) / self.full_uwh;
         if level > 100 {
             level = 100;
         }
-        Ok(level as _)
+        level as _
     }
 }
 
@@ -272,7 +272,7 @@ fn main() -> Result<()> {
             last_state = global.state;
         }
 
-        let level = global.level()?;
+        let level = global.level();
 
         println!("Current level: {level}");
 
