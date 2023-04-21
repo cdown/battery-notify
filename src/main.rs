@@ -43,7 +43,7 @@ impl Battery {
         if level > 100 {
             level = 100;
         }
-        Ok(level.try_into().unwrap())
+        Ok(level as _)
     }
 }
 
