@@ -201,7 +201,7 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
             || b.state == BatteryState::Full
     }) {
         // Confusingly some laptops set "Unknown" instead of "Not charging" when at threshold
-        BatteryState::NotCharging
+        BatteryState::AtThreshold
     } else {
         BatteryState::Discharging
     };
@@ -222,7 +222,6 @@ fn run_sleep_command(cmd: &str) {
 fn main() -> Result<()> {
     let cfg: Config = confy::load("battery-notify", "config")?;
     let interval = Duration::from_secs(cfg.interval_secs);
-    let mut last_state = BatteryState::Invalid;
     let mut state_notif = SingleNotification::new();
     let mut low_notif = SingleNotification::new();
     let mut mon_notif = SingleNotification::new();
@@ -254,26 +253,15 @@ fn main() -> Result<()> {
         }
 
         let global = get_global_battery(&batteries);
-        if global.state != last_state {
-            let state = if global.state == BatteryState::NotCharging {
-                // "not charging" is somewhat confusing, it just means we hit charging thresh
-                BatteryState::AtThreshold
-            } else {
-                global.state
-            };
-            state_notif.show(
-                format!(
-                    "Battery now {}",
-                    battery_state_to_name(state).to_lowercase()
-                ),
-                Urgency::Normal,
-            );
-            last_state = global.state;
-        }
+        state_notif.show(
+            format!(
+                "Battery now {}",
+                battery_state_to_name(global.state).to_lowercase()
+            ),
+            Urgency::Normal,
+        );
 
         let level = global.level();
-
-        println!("Current level: {level}");
 
         if global.state == BatteryState::Charging {
             low_notif.close();
