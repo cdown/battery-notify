@@ -385,12 +385,14 @@ fn main() -> Result<()> {
             let bbats = get_bluetooth_battery_levels().unwrap_or_else(|_| Vec::new());
             info!("Bluetooth battery status: {:?}", bbats);
             for bbat in &bbats {
+                let (_, notif) = bbat_notifs
+                    .raw_entry_mut()
+                    .from_key(&bbat.name)
+                    .or_insert_with(|| (bbat.name.clone(), SingleNotification::new()));
                 if bbat.level <= cfg.bluetooth_low_pct.into() {
-                    let (_, notif) = bbat_notifs
-                        .raw_entry_mut()
-                        .from_key(&bbat.name)
-                        .or_insert_with(|| (bbat.name.clone(), SingleNotification::new()));
                     notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
+                } else {
+                    notif.close();
                 }
             }
 
