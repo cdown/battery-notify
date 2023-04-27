@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod bluetooth;
+mod monitors;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 enum BatteryState {
@@ -149,47 +150,6 @@ fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
     })
 }
 
-#[cfg(feature = "mons")]
-fn get_nr_connected_monitors() -> Result<usize> {
-    use once_cell::sync::Lazy;
-    use x11rb::{connection::Connection, protocol::randr, rust_connection::RustConnection};
-
-    static CONN_AND_ROOT: Lazy<Option<(RustConnection, u32)>> = Lazy::new(|| {
-        let conn_and_root = x11rb::connect(None).map(|(c, screen)| {
-            let root = c.setup().roots[screen].root;
-            (c, root)
-        });
-        match conn_and_root {
-            Ok((conn, root)) => Some((conn, root)),
-            Err(err) => {
-                error!("Failed to connect to X, will not be able to retrieve monitor information: {err}");
-                None
-            }
-        }
-    });
-
-    let (conn, root) = match Lazy::force(&CONN_AND_ROOT) {
-        Some((conn, root)) => (conn, root),
-        None => bail!("No X connection"),
-    };
-
-    let resources = randr::get_screen_resources(conn, *root)?;
-
-    let mut nr_connected_monitors = 0;
-    for output in resources.reply()?.outputs {
-        let output_info = randr::get_output_info(conn, output, 0)?.reply()?;
-        if output_info.connection == randr::Connection::CONNECTED {
-            nr_connected_monitors += 1;
-        }
-    }
-    Ok(nr_connected_monitors)
-}
-
-#[cfg(not(feature = "mons"))]
-fn get_nr_connected_monitors() -> Result<usize> {
-    Ok(0)
-}
-
 fn get_batteries() -> Result<Vec<Battery>> {
     Ok(fs::read_dir("/sys/class/power_supply")?
         .filter_map(std::result::Result::ok)
@@ -303,7 +263,7 @@ fn main() -> Result<()> {
         }
 
         if cfg.warn_on_mons_with_no_ac > 0 && global.state == BatteryState::Discharging {
-            let conn = get_nr_connected_monitors().unwrap_or(0);
+            let conn = monitors::get_nr_connected().unwrap_or(0);
             info!("Current connected monitors: {conn}");
             if conn >= cfg.warn_on_mons_with_no_ac {
                 mon_notif.show(
