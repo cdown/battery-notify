@@ -12,6 +12,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+mod bluetooth;
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 enum BatteryState {
     Discharging,
@@ -42,12 +44,6 @@ impl Battery {
         }
         level as _
     }
-}
-
-#[derive(Debug)]
-struct BluetoothBattery {
-    name: String,
-    level: u8,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -129,52 +125,6 @@ fn name_to_battery_state(name: &str) -> BatteryState {
 
 fn battery_state_to_name(state: BatteryState) -> String {
     serde_plain::to_string(&state).unwrap()
-}
-
-#[cfg(feature = "bluetooth")]
-fn get_bluetooth_battery_levels() -> Result<Vec<BluetoothBattery>> {
-    use std::collections::HashMap as SHashMap;
-    use zbus::blocking::Connection;
-    use zbus::zvariant::{ObjectPath, Value};
-
-    type ManagedObjects<'a> =
-        SHashMap<ObjectPath<'a>, SHashMap<String, SHashMap<String, Value<'a>>>>;
-
-    let conn = Connection::system().map_err(|err| {
-        error!(
-            "Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}"
-        );
-        err
-    })?;
-
-    let ret = conn.call_method(
-        Some("org.bluez"),
-        "/",
-        Some("org.freedesktop.DBus.ObjectManager"),
-        "GetManagedObjects",
-        &(),
-    )?;
-    let (devices,): (ManagedObjects<'_>,) = ret.body()?;
-
-    Ok(devices
-        .iter()
-        .filter_map(|(_, ifs)| {
-            let bat = ifs.get("org.bluez.Battery1")?;
-            let level = bat
-                .get("Percentage")
-                .and_then(|p| p.clone().downcast::<u8>())?;
-            let dev = ifs.get("org.bluez.Device1")?;
-            let name = dev
-                .get("Name")
-                .and_then(|n| n.clone().downcast::<String>())?;
-            Some(BluetoothBattery { name, level })
-        })
-        .collect::<Vec<_>>())
-}
-
-#[cfg(not(feature = "bluetooth"))]
-fn get_bluetooth_battery_levels() -> Result<Vec<BluetoothBattery>> {
-    Ok(Vec::new())
 }
 
 /// Some drivers expose µAh (charge), some drivers expose µWh (energy), some drivers expose both.
@@ -368,7 +318,7 @@ fn main() -> Result<()> {
         }
 
         if cfg.bluetooth_low_pct != 0 {
-            let bbats = get_bluetooth_battery_levels().unwrap_or_else(|_| Vec::new());
+            let bbats = bluetooth::get_battery_levels().unwrap_or_else(|_| Vec::new());
             info!("Bluetooth battery status: {:?}", bbats);
             for bbat in &bbats {
                 let (_, notif) = bbat_notifs
