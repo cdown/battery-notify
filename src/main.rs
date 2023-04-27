@@ -363,15 +363,16 @@ fn main() -> Result<()> {
 
         if cfg.warn_on_mons_with_no_ac > 0
             && global.state == BatteryState::Discharging
-            && get_nr_connected_monitors().unwrap_or(0) >= cfg.warn_on_mons_with_no_ac
         {
-            mon_notif.show(
-                format!(
-                    "Connected to {} monitors but not AC",
-                    cfg.warn_on_mons_with_no_ac
-                ),
-                Urgency::Critical,
-            );
+            let conn = get_nr_connected_monitors().unwrap_or(0);
+            if conn >= cfg.warn_on_mons_with_no_ac {
+                mon_notif.show(
+                    format!("Connected to {} monitors but not AC", conn),
+                    Urgency::Critical,
+                );
+            } else {
+                mon_notif.close()
+            }
         } else {
             mon_notif.close();
         }
