@@ -215,13 +215,25 @@ fn get_nr_connected_monitors() -> Result<usize> {
     use once_cell::sync::Lazy;
     use x11rb::{connection::Connection, protocol::randr, rust_connection::RustConnection};
 
-    static CONN_AND_ROOT: Lazy<(RustConnection, u32)> = Lazy::new(|| {
-        let (conn, screen_num) = x11rb::connect(None).unwrap();
-        let root = conn.setup().roots[screen_num].root;
-        (conn, root)
+    static CONN_AND_ROOT: Lazy<Option<(RustConnection, u32)>> = Lazy::new(|| {
+        let conn_and_root = x11rb::connect(None).map(|(c, screen)| {
+            let root = c.setup().roots[screen].root;
+            (c, root)
+        });
+        match conn_and_root {
+            Ok((conn, root)) => Some((conn, root)),
+            Err(err) => {
+                eprintln!("Failed to connect to X, will not be able to retrieve monitor information: {err}");
+                None
+            }
+        }
     });
 
-    let (conn, root) = Lazy::force(&CONN_AND_ROOT);
+    let (conn, root) = match Lazy::force(&CONN_AND_ROOT) {
+        Some((conn, root)) => (conn, root),
+        None => bail!("No X connection"),
+    };
+
     let resources = randr::get_screen_resources(conn, *root)?;
 
     let mut nr_connected_monitors = 0;
