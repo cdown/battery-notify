@@ -69,7 +69,7 @@ impl Default for Config {
             sleep_pct: 15,
             low_pct: 40,
             warn_on_mons_with_no_ac: 2,
-            bluetooth_low_pct: 0,
+            bluetooth_low_pct: 40,
         }
     }
 }
