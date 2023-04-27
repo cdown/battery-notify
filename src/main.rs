@@ -384,7 +384,7 @@ fn main() -> Result<()> {
         if cfg.bluetooth_low_pct != 0 {
             let bbats = get_bluetooth_battery_levels().unwrap_or_else(|_| Vec::new());
             info!("Bluetooth battery status: {:?}", bbats);
-            for bbat in bbats {
+            for bbat in &bbats {
                 if bbat.level <= cfg.bluetooth_low_pct.into() {
                     let (_, notif) = bbat_notifs
                         .raw_entry_mut()
@@ -393,6 +393,9 @@ fn main() -> Result<()> {
                     notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
                 }
             }
+
+            // Get rid of any non-present devices and close the notification through Drop
+            bbat_notifs.retain(|key, _| bbats.iter().any(|b| b.name == *key));
         }
 
         let elapsed = start.elapsed();
