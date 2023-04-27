@@ -71,4 +71,8 @@ warn_on_mons_with_no_ac = 2
 bluetooth_low_pct = 40
 ```
 
+## Output
+
+If you don't like the output, you can disable logging with `RUST_LOG=none`.
+
 [Desktop Notifications]: https://specifications.freedesktop.org/notification-spec/latest/
