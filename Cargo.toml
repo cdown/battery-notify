@@ -17,7 +17,9 @@ cancellable-timer = "0.1.0"
 confy = "0.5.1"
 ctrlc = { version = "3.2.5", features = ["termination"] }
 dbus = { version = "0.9.7", optional = true }
+env_logger = "0.10.0"
 hashbrown = "0.13.2"
+log = "0.4.17"
 notify-rust = "4.8.0"
 once_cell = { version = "1.17.1", optional = true }
 serde = { version = "1.0.160", features = ["derive"] }

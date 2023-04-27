@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use hashbrown::HashMap;
+use log::{error, info};
 use notify_rust::{Notification, NotificationHandle, Urgency};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -94,7 +95,7 @@ impl SingleNotification {
                 .summary(&self.summary)
                 .urgency(urgency)
                 .show()
-                .map_err(|err| eprintln!("error showing notification: {err}"))
+                .map_err(|err| error!("error showing notification: {err}"))
                 .ok();
         }
     }
@@ -145,7 +146,7 @@ fn get_bluetooth_battery_levels() -> Result<Vec<BluetoothBattery>> {
             match Connection::new_system() {
                 Ok(c) => Some(c),
                 Err(err) => {
-                    eprintln!("Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}");
+                    error!("Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}");
                     None
                 },
             }
@@ -223,7 +224,7 @@ fn get_nr_connected_monitors() -> Result<usize> {
         match conn_and_root {
             Ok((conn, root)) => Some((conn, root)),
             Err(err) => {
-                eprintln!("Failed to connect to X, will not be able to retrieve monitor information: {err}");
+                error!("Failed to connect to X, will not be able to retrieve monitor information: {err}");
                 None
             }
         }
@@ -296,7 +297,7 @@ fn get_global_battery(batteries: &[Battery]) -> Battery {
 
 fn run_sleep_command(cmd: &str) {
     if let Err(err) = Command::new("sh").args(["-c", cmd]).status() {
-        eprintln!("Failed to run sleep command '{cmd}': {err}");
+        error!("Failed to run sleep command '{cmd}': {err}");
     }
 }
 
@@ -313,6 +314,8 @@ fn main() -> Result<()> {
     let (mut timer, canceller) = cancellable_timer::Timer::new2()?;
     let mut bbat_notifs = HashMap::new();
 
+    env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
+
     ctrlc::set_handler(move || {
         st_for_hnd.store(true, Ordering::Relaxed);
         // If we fail to cancel, we'll just do it at the next start of the loop
@@ -320,7 +323,7 @@ fn main() -> Result<()> {
     })
     .expect("Failed to set signal handler");
 
-    println!(
+    info!(
         "Config (configurable at {}):\n\n{:#?}\n",
         confy::get_configuration_file_path("battery-notify", "config")?.display(),
         cfg
