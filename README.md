@@ -17,13 +17,11 @@ changes to system or Bluetooth battery state.
 
     cargo install battery-notify
 
-If you use the `bluetooth` feature, you will need `libdbus` available.
-
 Default features:
 
 - `mons`: Support `warn_on_mons_with_no_ac`. Adds a dependency on the x11rb
   crate.
-- `bluetooth`: Support `bluetooth_low_pct`. Adds a dependency on the dbus
+- `bluetooth`: Support `bluetooth_low_pct`. Adds a dependency on the zbus
   crate. You will also need to run `bluetoothd` with the `--experimental` flag
   to expose battery information.
 

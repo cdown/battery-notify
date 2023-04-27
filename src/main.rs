@@ -47,7 +47,7 @@ impl Battery {
 #[derive(Debug)]
 struct BluetoothBattery {
     name: String,
-    level: u64,
+    level: u8,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -133,54 +133,40 @@ fn battery_state_to_name(state: BatteryState) -> String {
 
 #[cfg(feature = "bluetooth")]
 fn get_bluetooth_battery_levels() -> Result<Vec<BluetoothBattery>> {
-    use dbus::{
-        arg::{RefArg, Variant},
-        blocking::Connection,
-    };
-    use once_cell::sync::Lazy;
     use std::collections::HashMap as SHashMap;
+    use zbus::blocking::Connection;
+    use zbus::zvariant::{ObjectPath, Value};
 
     type ManagedObjects<'a> =
-        SHashMap<dbus::Path<'a>, SHashMap<String, SHashMap<String, Variant<Box<dyn RefArg>>>>>;
+        SHashMap<ObjectPath<'a>, SHashMap<String, SHashMap<String, Value<'a>>>>;
 
-    thread_local! {
-        static CONN: Lazy<Option<Connection>> = Lazy::new(|| {
-            match Connection::new_system() {
-                Ok(c) => Some(c),
-                Err(err) => {
-                    error!("Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}");
-                    None
-                },
-            }
-        });
-    }
+    let conn = Connection::system().map_err(|err| {
+        error!(
+            "Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}"
+        );
+        err
+    })?;
 
-    let devices = CONN.with(|conn| {
-        let conn = Lazy::force(conn);
-        let conn = match conn {
-            Some(c) => c,
-            None => return Err(dbus::Error::new_failed("No connection")),
-        };
-        let proxy = conn.with_proxy("org.bluez", "/", Duration::from_secs(1));
-        let devices: std::result::Result<ManagedObjects<'_>, dbus::Error> = proxy
-            .method_call(
-                "org.freedesktop.DBus.ObjectManager",
-                "GetManagedObjects",
-                (),
-            )
-            .map(|(devices,)| devices);
-        devices
-    });
+    let ret = conn.call_method(
+        Some("org.bluez"),
+        "/",
+        Some("org.freedesktop.DBus.ObjectManager"),
+        "GetManagedObjects",
+        &(),
+    )?;
+    let (devices,): (ManagedObjects<'_>,) = ret.body()?;
 
-    Ok(devices?
-        .into_iter()
+    Ok(devices
+        .iter()
         .filter_map(|(_, ifs)| {
             let bat = ifs.get("org.bluez.Battery1")?;
-            let level = bat.get("Percentage").and_then(|p| p.as_u64())?;
+            let level = bat
+                .get("Percentage")
+                .and_then(|p| p.clone().downcast::<u8>())?;
             let dev = ifs.get("org.bluez.Device1")?;
             let name = dev
                 .get("Name")
-                .and_then(|n| n.as_str().map(|s| s.to_owned()))?;
+                .and_then(|n| n.clone().downcast::<String>())?;
             Some(BluetoothBattery { name, level })
         })
         .collect::<Vec<_>>())
@@ -389,7 +375,7 @@ fn main() -> Result<()> {
                     .raw_entry_mut()
                     .from_key(&bbat.name)
                     .or_insert_with(|| (bbat.name.clone(), SingleNotification::new()));
-                if bbat.level <= cfg.bluetooth_low_pct.into() {
+                if bbat.level <= cfg.bluetooth_low_pct {
                     notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
                 } else {
                     notif.close();
