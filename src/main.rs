@@ -3,10 +3,9 @@ use hashbrown::HashMap;
 use log::{error, info};
 use notify_rust::Urgency;
 use serde::{Deserialize, Serialize};
-use std::ffi::OsStr;
-use std::fs;
+
 use std::io;
-use std::path::Path;
+
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -15,40 +14,9 @@ use std::time::{Duration, Instant};
 mod bluetooth;
 mod monitors;
 mod notification;
+mod system;
 
 use notification::SingleNotification;
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
-enum BatteryState {
-    Discharging,
-    Charging,
-    #[serde(rename = "Not charging")]
-    NotCharging,
-    Full,
-    Unknown,
-
-    // These are internal values -- they never come from sysfs
-    #[serde(rename = "At threshold")]
-    AtThreshold,
-    Invalid,
-}
-
-#[derive(Debug)]
-struct Battery {
-    state: BatteryState,
-    now_uwh: u64,
-    full_uwh: u64,
-}
-
-impl Battery {
-    const fn level(&self) -> u8 {
-        let mut level = (self.now_uwh * 100) / self.full_uwh;
-        if level > 100 {
-            level = 100;
-        }
-        level as _
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
@@ -71,87 +39,6 @@ impl Default for Config {
             warn_on_mons_with_no_ac: 2,
             bluetooth_low_pct: 40,
         }
-    }
-}
-
-fn read_battery_file(dir: &Path, file: impl AsRef<str>) -> Result<String> {
-    let mut content = fs::read_to_string(dir.join(file.as_ref()))?;
-    if let Some(idx) = content.find('\n') {
-        content.truncate(idx);
-    }
-    Ok(content)
-}
-
-fn name_to_battery_state(name: &str) -> BatteryState {
-    serde_plain::from_str(name).unwrap()
-}
-
-fn battery_state_to_name(state: BatteryState) -> String {
-    serde_plain::to_string(&state).unwrap()
-}
-
-/// Some drivers expose µAh (charge), some drivers expose µWh (energy), some drivers expose both.
-fn read_battery_file_energy_or_charge(dir: &Path, partial_file: &str) -> Result<u64> {
-    let uwh = read_battery_file(dir, "energy_".to_string() + partial_file);
-    if uwh.is_ok() {
-        return Ok(uwh?.parse()?);
-    }
-
-    let voltage: u64 = read_battery_file(dir, "voltage_now")?.parse()?;
-    let uah: u64 = read_battery_file(dir, "charge_".to_string() + partial_file)?.parse()?;
-    Ok((uah * voltage) / 1000)
-}
-
-fn read_battery_dir(dir: impl AsRef<Path>) -> Result<Battery> {
-    let dir = dir.as_ref();
-
-    Ok(Battery {
-        state: name_to_battery_state(&read_battery_file(dir, "status")?),
-        now_uwh: read_battery_file_energy_or_charge(dir, "now")?,
-        full_uwh: read_battery_file_energy_or_charge(dir, "full")?,
-    })
-}
-
-fn get_batteries() -> Result<Vec<Battery>> {
-    Ok(fs::read_dir("/sys/class/power_supply")?
-        .filter_map(std::result::Result::ok)
-        .map(|e| e.path())
-        .filter(|p| {
-            p.file_name()
-                .and_then(OsStr::to_str)
-                .unwrap_or("")
-                .starts_with("BAT")
-        })
-        .map(read_battery_dir)
-        .filter_map(std::result::Result::ok)
-        .collect::<Vec<Battery>>())
-}
-
-fn get_global_battery(batteries: &[Battery]) -> Battery {
-    let state = if batteries.iter().any(|b| b.state == BatteryState::Charging) {
-        BatteryState::Charging
-    } else if batteries
-        .iter()
-        .any(|b| b.state == BatteryState::Discharging)
-    {
-        BatteryState::Discharging
-    } else if batteries.iter().all(|b| b.state == BatteryState::Full) {
-        BatteryState::Full
-    } else if batteries.iter().all(|b| {
-        b.state == BatteryState::Unknown
-            || b.state == BatteryState::NotCharging
-            || b.state == BatteryState::Full
-    }) {
-        // Confusingly some laptops set "Unknown" instead of "Not charging" when at threshold
-        BatteryState::AtThreshold
-    } else {
-        BatteryState::Discharging
-    };
-
-    Battery {
-        state,
-        now_uwh: batteries.iter().map(|b| b.now_uwh).sum(),
-        full_uwh: batteries.iter().map(|b| b.full_uwh).sum(),
     }
 }
 
@@ -191,7 +78,7 @@ fn main() -> Result<()> {
 
     while !should_term.load(Ordering::Relaxed) {
         let start = Instant::now();
-        let batteries = get_batteries().context("failed to get list of batteries")?;
+        let batteries = system::get_batteries().context("failed to get list of batteries")?;
 
         if batteries.is_empty() {
             bail!("no batteries detected");
@@ -199,19 +86,19 @@ fn main() -> Result<()> {
 
         info!("Battery status: {:?}", &batteries);
 
-        let global = get_global_battery(&batteries);
+        let global = system::get_global_battery(&batteries);
         info!("Global status: {:?}", &global);
         state_notif.show(
             format!(
                 "Battery now {}",
-                battery_state_to_name(global.state).to_lowercase()
+                system::battery_state_to_name(global.state).to_lowercase()
             ),
             Urgency::Normal,
         );
 
         let level = global.level();
 
-        if global.state == BatteryState::Charging {
+        if global.state == system::BatteryState::Charging {
             low_notif.close();
         } else if level <= cfg.sleep_pct {
             low_notif.show("Battery critical".to_string(), Urgency::Critical);
@@ -224,7 +111,7 @@ fn main() -> Result<()> {
             low_notif.show("Battery low".to_string(), Urgency::Critical);
         }
 
-        if cfg.warn_on_mons_with_no_ac > 0 && global.state == BatteryState::Discharging {
+        if cfg.warn_on_mons_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
             let conn = monitors::get_nr_connected().unwrap_or(0);
             info!("Current connected monitors: {conn}");
             if conn >= cfg.warn_on_mons_with_no_ac {
