@@ -17,6 +17,8 @@ changes to system or Bluetooth battery state.
 
     cargo install battery-notify
 
+If you use the `bluetooth` feature, you will need `libdbus` available.
+
 Default features:
 
 - `mons`: Support `warn_on_mons_with_no_ac`. Adds a dependency on the x11rb
@@ -42,7 +44,6 @@ on first run, this will be populated with a basic config if it doesn't exist.
 The default config is:
 
 ```toml
-
 # How often to check battery status, in seconds.
 interval_secs = 30
 
