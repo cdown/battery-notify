@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use hashbrown::HashMap;
-use log::{error, info, trace};
-use notify_rust::{Notification, NotificationHandle, Urgency};
+use log::{error, info};
+use notify_rust::Urgency;
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
 use std::fs;
@@ -14,6 +14,9 @@ use std::time::{Duration, Instant};
 
 mod bluetooth;
 mod monitors;
+mod notification;
+
+use notification::SingleNotification;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Serialize, Deserialize)]
 enum BatteryState {
@@ -68,47 +71,6 @@ impl Default for Config {
             warn_on_mons_with_no_ac: 2,
             bluetooth_low_pct: 40,
         }
-    }
-}
-
-struct SingleNotification {
-    hnd: Option<NotificationHandle>,
-    summary: String,
-}
-
-impl SingleNotification {
-    const fn new() -> Self {
-        Self {
-            hnd: None,
-            summary: String::new(),
-        }
-    }
-
-    fn show(&mut self, summary: String, urgency: Urgency) {
-        if self.summary != summary {
-            self.close();
-            self.summary = summary;
-            trace!("Creating notification for {}", self.summary);
-            self.hnd = Notification::new()
-                .summary(&self.summary)
-                .urgency(urgency)
-                .show()
-                .map_err(|err| error!("error showing notification: {err}"))
-                .ok();
-        }
-    }
-
-    fn close(&mut self) {
-        if let Some(hnd) = self.hnd.take() {
-            trace!("Closing notification for {}", self.summary);
-            hnd.close();
-        }
-    }
-}
-
-impl Drop for SingleNotification {
-    fn drop(&mut self) {
-        self.close();
     }
 }
 
