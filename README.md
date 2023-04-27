@@ -1,7 +1,17 @@
 # battery-notify | [![Tests](https://img.shields.io/github/actions/workflow/status/cdown/battery-notify/ci.yml?branch=master)](https://github.com/cdown/battery-notify/actions?query=branch%3Amaster)
 
 battery-notify is a small, Linux-only program that sends notifications on
-changes to system battery state.
+changes to system or Bluetooth battery state.
+
+## Features
+
+- Small, easy to understand codebase
+- Notifications on battery state change
+- Bluetooth battery support
+- Works with multiple system batteries
+- Warnings on low/critical battery percentages
+- Warnings when connected to an external monitor but not mains power (X11 only)
+- Ability to sleep the computer with a custom command on critical percentage
 
 ## Installation
 
@@ -17,15 +27,6 @@ Default features:
 
 If you don't want to use some subset of these features, you can pass
 `--no-default-features` and select the ones you do want with `--feature`.
-
-## Features
-
-- Small, easy to understand codebase
-- Notifications on battery state change
-- Works with multiple batteries
-- Warnings on low/critical battery percentages
-- Warnings when connected to an external monitor but not mains power (X11 only)
-- Ability to sleep the computer with a custom command on critical percentage
 
 ## Usage
 
