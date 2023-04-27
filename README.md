@@ -59,12 +59,16 @@ sleep_command = 'systemctl suspend'
 # If this many monitors are connected (that is, plugged in -- they can be off)
 # and we are discharging, show a warning. Intended to avoid cases where power
 # is inadvertently disconnected at a desk.
+#
+# Set to 0 to disable.
 warn_on_mons_with_no_ac = 2
 
 # If a bluetooth device is below this percentage, notify about low battery.
 # Note that you need to run bluetoothd with --experimental in order for it to
 # expose battery information.
-bluetooth_low_pct = 2
+#
+# Set to 0 to disable.
+bluetooth_low_pct = 40
 ```
 
 [Desktop Notifications]: https://specifications.freedesktop.org/notification-spec/latest/
