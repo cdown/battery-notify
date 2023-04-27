@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use hashbrown::HashMap;
-use log::{error, info};
+use log::{error, info, trace};
 use notify_rust::{Notification, NotificationHandle, Urgency};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -91,6 +91,7 @@ impl SingleNotification {
         if self.summary != summary {
             self.close();
             self.summary = summary;
+            trace!("Creating notification for {}", self.summary);
             self.hnd = Notification::new()
                 .summary(&self.summary)
                 .urgency(urgency)
@@ -102,6 +103,7 @@ impl SingleNotification {
 
     fn close(&mut self) {
         if let Some(hnd) = self.hnd.take() {
+            trace!("Closing notification for {}", self.summary);
             hnd.close();
         }
     }
@@ -337,7 +339,10 @@ fn main() -> Result<()> {
             bail!("no batteries detected");
         }
 
+        info!("Battery status: {:?}", &batteries);
+
         let global = get_global_battery(&batteries);
+        info!("Global status: {:?}", &global);
         state_notif.show(
             format!(
                 "Battery now {}",
@@ -361,10 +366,9 @@ fn main() -> Result<()> {
             low_notif.show("Battery low".to_string(), Urgency::Critical);
         }
 
-        if cfg.warn_on_mons_with_no_ac > 0
-            && global.state == BatteryState::Discharging
-        {
+        if cfg.warn_on_mons_with_no_ac > 0 && global.state == BatteryState::Discharging {
             let conn = get_nr_connected_monitors().unwrap_or(0);
+            info!("Current connected monitors: {conn}");
             if conn >= cfg.warn_on_mons_with_no_ac {
                 mon_notif.show(
                     format!("Connected to {} monitors but not AC", conn),
@@ -378,7 +382,9 @@ fn main() -> Result<()> {
         }
 
         if cfg.bluetooth_low_pct != 0 {
-            for bbat in get_bluetooth_battery_levels().unwrap_or_else(|_| Vec::new()) {
+            let bbats = get_bluetooth_battery_levels().unwrap_or_else(|_| Vec::new());
+            info!("Bluetooth battery status: {:?}", bbats);
+            for bbat in bbats {
                 if bbat.level <= cfg.bluetooth_low_pct.into() {
                     let (_, notif) = bbat_notifs
                         .raw_entry_mut()
