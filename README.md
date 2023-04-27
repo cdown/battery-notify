@@ -7,8 +7,16 @@ changes to system battery state.
 
     cargo install battery-notify
 
-If you don't want to use `warn_on_mons_with_no_ac`, you can compile with
-`--no-default-features` to avoid depending on x11rb.
+Default features:
+
+- `mons`: Support `warn_on_mons_with_no_ac`. Adds a dependency on the x11rb
+  crate.
+- `bluetooth`: Support `bluetooth_low_pct`. Adds a dependency on the dbus
+  crate. You will also need to run `bluetoothd` with the `--experimental` flag
+  to expose battery information.
+
+If you don't want to use some subset of these features, you can pass
+`--no-default-features` and select the ones you do want with `--feature`.
 
 ## Features
 
@@ -52,6 +60,11 @@ sleep_command = 'systemctl suspend'
 # and we are discharging, show a warning. Intended to avoid cases where power
 # is inadvertently disconnected at a desk.
 warn_on_mons_with_no_ac = 2
+
+# If a bluetooth device is below this percentage, notify about low battery.
+# Note that you need to run bluetoothd with --experimental in order for it to
+# expose battery information.
+bluetooth_low_pct = 2
 ```
 
 [Desktop Notifications]: https://specifications.freedesktop.org/notification-spec/latest/

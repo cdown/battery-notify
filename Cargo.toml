@@ -16,6 +16,8 @@ anyhow = "1.0.70"
 cancellable-timer = "0.1.0"
 confy = "0.5.1"
 ctrlc = { version = "3.2.5", features = ["termination"] }
+dbus = { version = "0.9.7", optional = true }
+hashbrown = "0.13.2"
 notify-rust = "4.8.0"
 once_cell = { version = "1.17.1", optional = true }
 serde = { version = "1.0.160", features = ["derive"] }
@@ -23,5 +25,6 @@ serde_plain = "1.0.1"
 x11rb = { version = "0.11.1", features = ["randr"], optional = true }
 
 [features]
-default = ["mons"]
+default = ["mons", "bluetooth"]
 mons = ["once_cell", "x11rb"]
+bluetooth = ["once_cell", "dbus"]

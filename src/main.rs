@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use hashbrown::HashMap;
 use notify_rust::{Notification, NotificationHandle, Urgency};
 use serde::{Deserialize, Serialize};
 use std::ffi::OsStr;
@@ -42,6 +43,12 @@ impl Battery {
     }
 }
 
+#[derive(Debug)]
+struct BluetoothBattery {
+    name: String,
+    level: u64,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 struct Config {
@@ -50,6 +57,7 @@ struct Config {
     sleep_pct: u8,
     low_pct: u8,
     warn_on_mons_with_no_ac: usize,
+    bluetooth_low_pct: u8,
 }
 
 impl Default for Config {
@@ -60,6 +68,7 @@ impl Default for Config {
             sleep_pct: 15,
             low_pct: 40,
             warn_on_mons_with_no_ac: 2,
+            bluetooth_low_pct: 0,
         }
     }
 }
@@ -117,6 +126,66 @@ fn name_to_battery_state(name: &str) -> BatteryState {
 
 fn battery_state_to_name(state: BatteryState) -> String {
     serde_plain::to_string(&state).unwrap()
+}
+
+#[cfg(feature = "bluetooth")]
+fn get_bluetooth_battery_levels() -> Result<Vec<BluetoothBattery>> {
+    use dbus::{
+        arg::{RefArg, Variant},
+        blocking::Connection,
+    };
+    use once_cell::sync::Lazy;
+    use std::collections::HashMap as SHashMap;
+
+    type ManagedObjects<'a> =
+        SHashMap<dbus::Path<'a>, SHashMap<String, SHashMap<String, Variant<Box<dyn RefArg>>>>>;
+
+    thread_local! {
+        static CONN: Lazy<Option<Connection>> = Lazy::new(|| {
+            match Connection::new_system() {
+                Ok(c) => Some(c),
+                Err(err) => {
+                    eprintln!("Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}");
+                    None
+                },
+            }
+        });
+    }
+
+    let devices = CONN.with(|conn| {
+        let conn = Lazy::force(conn);
+        let conn = match conn {
+            Some(c) => c,
+            None => return Err(dbus::Error::new_failed("No connection")),
+        };
+        let proxy = conn.with_proxy("org.bluez", "/", Duration::from_secs(1));
+        let devices: std::result::Result<ManagedObjects<'_>, dbus::Error> = proxy
+            .method_call(
+                "org.freedesktop.DBus.ObjectManager",
+                "GetManagedObjects",
+                (),
+            )
+            .map(|(devices,)| devices);
+        devices
+    });
+
+    Ok(devices?
+        .into_iter()
+        .filter_map(|(_, ifs)| {
+            let bat = ifs.get("org.bluez.Battery1")?;
+            let level = bat.get("Percentage").and_then(|p| p.as_u64())?;
+            let dev = ifs.get("org.bluez.Device1")?;
+            let name = dev
+                .get("Name")
+                .and_then(|n| n.as_str().map(|s| s.to_owned()))?;
+            Some(BluetoothBattery { name, level })
+        })
+        .collect::<Vec<_>>())
+}
+
+#[cfg(not(feature = "bluetooth"))]
+fn get_bluetooth_battery_levels() -> Result<Vec<BluetoothBattery>> {
+    Ok(Vec::new())
 }
 
 /// Some drivers expose µAh (charge), some drivers expose µWh (energy), some drivers expose both.
@@ -230,6 +299,7 @@ fn main() -> Result<()> {
     let should_term = Arc::new(AtomicBool::new(false));
     let st_for_hnd = should_term.clone();
     let (mut timer, canceller) = cancellable_timer::Timer::new2()?;
+    let mut bbat_notifs = HashMap::new();
 
     ctrlc::set_handler(move || {
         st_for_hnd.store(true, Ordering::Relaxed);
@@ -289,6 +359,18 @@ fn main() -> Result<()> {
             );
         } else {
             mon_notif.close();
+        }
+
+        if cfg.bluetooth_low_pct != 0 {
+            for bbat in get_bluetooth_battery_levels().unwrap_or_else(|_| Vec::new()) {
+                if bbat.level <= cfg.bluetooth_low_pct.into() {
+                    let (_, notif) = bbat_notifs
+                        .raw_entry_mut()
+                        .from_key(&bbat.name)
+                        .or_insert_with(|| (bbat.name.clone(), SingleNotification::new()));
+                    notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
+                }
+            }
         }
 
         let elapsed = start.elapsed();
