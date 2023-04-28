@@ -9,12 +9,11 @@ pub struct BluetoothBattery {
 #[cfg(feature = "bluetooth")]
 pub fn get_battery_levels() -> Result<Vec<BluetoothBattery>> {
     use log::error;
-    use std::collections::HashMap as SHashMap;
+    use std::collections::HashMap;
     use zbus::blocking::Connection;
     use zbus::zvariant::{ObjectPath, Value};
 
-    type ManagedObjects<'a> =
-        SHashMap<ObjectPath<'a>, SHashMap<String, SHashMap<String, Value<'a>>>>;
+    type ManagedObjects<'a> = HashMap<ObjectPath<'a>, HashMap<String, HashMap<String, Value<'a>>>>;
 
     let conn = Connection::system().map_err(|err| {
         error!(
