@@ -76,6 +76,8 @@ fn main() -> Result<()> {
         cfg
     );
 
+    let mut next_wake = Instant::now() + interval;
+
     while !should_term.load(Ordering::Relaxed) {
         let start = Instant::now();
         let batteries = system::get_batteries().context("failed to get list of batteries")?;
@@ -145,14 +147,15 @@ fn main() -> Result<()> {
             bbat_notifs.retain(|key, _| bbats.iter().any(|b| b.name == *key));
         }
 
-        let elapsed = start.elapsed();
-
-        if elapsed < interval {
-            match timer.sleep(interval - elapsed) {
+        let now = Instant::now();
+        if now < next_wake {
+            match timer.sleep(next_wake - now) {
                 Err(err) if err.kind() != io::ErrorKind::Interrupted => Err(err),
                 _ => Ok(()),
             }?;
         }
+
+        next_wake += interval;
     }
 
     Ok(())
