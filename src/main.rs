@@ -153,9 +153,11 @@ fn main() -> Result<()> {
                 Err(err) if err.kind() != io::ErrorKind::Interrupted => Err(err),
                 _ => Ok(()),
             }?;
+            next_wake += interval;
+        } else {
+            // Avoid spamming with more runs
+            next_wake = now + interval;
         }
-
-        next_wake += interval;
     }
 
     Ok(())
