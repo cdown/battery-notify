@@ -100,7 +100,7 @@ fn main() -> Result<()> {
 
         let level = global.level();
 
-        if global.state == system::BatteryState::Charging {
+        if global.state == system::BatteryState::Charging || level > cfg.low_pct {
             low_notif.close();
         } else if level <= cfg.sleep_pct {
             low_notif.show("Battery critical".to_string(), Urgency::Critical);
