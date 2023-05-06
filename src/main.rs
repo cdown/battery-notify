@@ -114,7 +114,12 @@ fn main() -> Result<()> {
         }
 
         if cfg.warn_on_mons_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
-            let conn = monitors::get_nr_connected().unwrap_or(0);
+            let conn = monitors::get_nr_connected()
+                .map_err(|err| {
+                    error!("{err}");
+                    err
+                })
+                .unwrap_or(0);
             info!("Current connected monitors: {conn}");
             if conn >= cfg.warn_on_mons_with_no_ac {
                 mon_notif.show(
@@ -129,7 +134,12 @@ fn main() -> Result<()> {
         }
 
         if cfg.bluetooth_low_pct != 0 {
-            let bbats = bluetooth::get_battery_levels().unwrap_or_else(|_| Vec::new());
+            let bbats = bluetooth::get_battery_levels()
+                .map_err(|err| {
+                    error!("{err}");
+                    err
+                })
+                .unwrap_or_else(|_| Vec::new());
             info!("Bluetooth battery status: {:?}", bbats);
             for bbat in &bbats {
                 let (_, notif) = bbat_notifs
