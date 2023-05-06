@@ -8,21 +8,16 @@ pub struct BluetoothBattery {
 
 #[cfg(feature = "bluetooth")]
 pub fn get_battery_levels() -> Result<Vec<BluetoothBattery>> {
-    use log::error;
+    use once_cell::sync::Lazy;
     use std::collections::HashMap;
     use zbus::blocking::Connection;
     use zbus::zvariant::{ObjectPath, Value};
 
     type ManagedObjects<'a> = HashMap<ObjectPath<'a>, HashMap<String, HashMap<String, Value<'a>>>>;
 
-    let conn = Connection::system().map_err(|err| {
-        error!(
-            "Failed to connect to dbus, will not be able to retrieve bluetooth information: {err}"
-        );
-        err
-    })?;
+    static CONN: Lazy<Connection> = Lazy::new(|| Connection::system().unwrap());
 
-    let ret = conn.call_method(
+    let ret = CONN.call_method(
         Some("org.bluez"),
         "/",
         Some("org.freedesktop.DBus.ObjectManager"),
