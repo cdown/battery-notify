@@ -78,7 +78,17 @@ fn main() -> Result<()> {
 
     let mut next_wake = Instant::now() + interval;
 
+    sd_notify::notify(
+        false,
+        &[
+            sd_notify::NotifyState::Ready,
+            // Grace period in case interval takes too long
+            sd_notify::NotifyState::WatchdogUsec((interval * 2).as_micros().try_into()?),
+        ],
+    )?;
+
     while !should_term.load(Ordering::Relaxed) {
+        sd_notify::notify(false, &[sd_notify::NotifyState::Watchdog])?;
         let start = Instant::now();
         let batteries = system::get_batteries().context("failed to get list of batteries")?;
 

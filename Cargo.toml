@@ -21,6 +21,7 @@ hashbrown = "0.13.2"
 log = "0.4.17"
 notify-rust = "4.8.0"
 once_cell = { version = "1.17.1", optional = true }
+sd-notify = "0.4.1"
 serde = { version = "1.0.162", default-features = false }
 serde_plain = "1.0.1"
 x11rb = { version = "0.11.1", features = ["randr"], optional = true, default-features = false }
