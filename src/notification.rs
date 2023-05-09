@@ -1,25 +1,19 @@
 use log::{error, trace};
 use notify_rust::{Notification, NotificationHandle, Urgency};
 
+#[derive(Default)]
 pub struct SingleNotification {
     hnd: Option<NotificationHandle>,
     summary: String,
 }
 
 impl SingleNotification {
-    pub const fn new() -> Self {
-        Self {
-            hnd: None,
-            summary: String::new(),
-        }
-    }
-
     pub fn show(&mut self, summary: String, urgency: Urgency) {
         if self.summary != summary {
             self.close();
             self.summary = summary;
             trace!("Creating notification for {}", self.summary);
-            self.hnd = Notification::new()
+            self.hnd = Notification::default()
                 .summary(&self.summary)
                 .urgency(urgency)
                 .show()

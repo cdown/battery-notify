@@ -51,9 +51,9 @@ fn run_sleep_command(cmd: &str) {
 fn main() -> Result<()> {
     let cfg: Config = confy::load("battery-notify", "config")?;
     let interval = Duration::from_secs(cfg.interval_secs);
-    let mut state_notif = SingleNotification::new();
-    let mut low_notif = SingleNotification::new();
-    let mut mon_notif = SingleNotification::new();
+    let mut state_notif = SingleNotification::default();
+    let mut low_notif = SingleNotification::default();
+    let mut mon_notif = SingleNotification::default();
     let sleep_backoff = Duration::from_secs(60);
     let mut next_sleep_epoch = Instant::now();
     let should_term = Arc::new(AtomicBool::new(false));
@@ -151,7 +151,7 @@ fn main() -> Result<()> {
                 let (_, notif) = bbat_notifs
                     .raw_entry_mut()
                     .from_key(&bbat.name)
-                    .or_insert_with(|| (bbat.name.clone(), SingleNotification::new()));
+                    .or_insert_with(|| (bbat.name.clone(), SingleNotification::default()));
                 if bbat.level <= cfg.bluetooth_low_pct {
                     notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
                 } else {
