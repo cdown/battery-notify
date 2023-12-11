@@ -24,7 +24,7 @@ once_cell = { version = "1.18.0", optional = true }
 sd-notify = "0.4.1"
 serde = { version = "1.0.193", default-features = false }
 serde_plain = "1.0.2"
-x11rb = { version = "0.12.0", features = ["randr"], optional = true, default-features = false }
+x11rb = { version = "0.13.0", features = ["randr"], optional = true, default-features = false }
 zbus = { version = "3.14.1", optional = true, default-features = false }
 
 [features]
