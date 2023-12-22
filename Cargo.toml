@@ -15,7 +15,7 @@ rust-version = "1.60.0"
 anyhow = "1.0.75"
 cancellable-timer = "0.1.0"
 confy = "0.5.1"
-ctrlc = { version = "3.4.1", features = ["termination"] }
+ctrlc = { version = "3.4.2", features = ["termination"] }
 env_logger = { version = "0.10.1", features = ["humantime"], default-features = false }
 hashbrown = "0.14.2"
 log = "0.4.20"
