@@ -24,7 +24,8 @@ pub fn get_battery_levels() -> Result<Vec<BluetoothBattery>> {
         "GetManagedObjects",
         &(),
     )?;
-    let (devices,): (ManagedObjects<'_>,) = ret.body()?;
+    let body = ret.body();
+    let (devices,): (ManagedObjects<'_>,) = body.deserialize()?;
 
     Ok(devices
         .iter()
@@ -32,11 +33,11 @@ pub fn get_battery_levels() -> Result<Vec<BluetoothBattery>> {
             let bat = ifs.get("org.bluez.Battery1")?;
             let level = bat
                 .get("Percentage")
-                .and_then(|p| p.clone().downcast::<u8>())?;
+                .and_then(|p| p.clone().downcast::<u8>().ok())?;
             let dev = ifs.get("org.bluez.Device1")?;
             let name = dev
                 .get("Name")
-                .and_then(|n| n.clone().downcast::<String>())?;
+                .and_then(|n| n.clone().downcast::<String>().ok())?;
             Some(BluetoothBattery { name, level })
         })
         .collect::<Vec<_>>())

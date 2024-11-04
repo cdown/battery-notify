@@ -9,23 +9,23 @@ readme = "README.md"
 keywords = ["battery", "linux", "notify", "popup"]
 categories = ["command-line-utilities"]
 license = "MIT"
-rust-version = "1.60.0"
+rust-version = "1.80"
 
 [dependencies]
-anyhow = "1.0.91"
+anyhow = "1.0.92"
 cancellable-timer = "0.1.0"
 confy = "0.6.1"
-ctrlc = { version = "3.4.0", features = ["termination"] }
-env_logger = { version = "0.10.2", features = ["humantime"], default-features = false }
-hashbrown = "0.12.3"
+ctrlc = { version = "3.4.5", features = ["termination"] }
+env_logger = { version = "0.11.5", features = ["humantime"], default-features = false }
+hashbrown = "0.15.0"
 log = "0.4.22"
-notify-rust = "4.10.0"
+notify-rust = "4.11.3"
 once_cell = { version = "1.20.2", optional = true }
 sd-notify = "0.4.3"
-serde = { version = "1.0.213", default-features = false }
+serde = { version = "1.0.214", default-features = false }
 serde_plain = "1.0.2"
-x11rb = { version = "0.12.0", features = ["randr"], optional = true, default-features = false }
-zbus = { version = "3.13.1", features = ["async-io"], optional = true, default-features = false }
+x11rb = { version = "0.13.1", features = ["randr"], optional = true, default-features = false }
+zbus = { version = "5.1.0", features = ["async-io", "blocking-api"], optional = true, default-features = false }
 
 [features]
 default = ["mons", "bluetooth"]
