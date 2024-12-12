@@ -22,22 +22,34 @@ use notification::SingleNotification;
 #[serde(default)]
 struct Config {
     sleep_command: String,
-    interval_secs: u64,
+    interval: u64,
     sleep_pct: u8,
     low_pct: u8,
     warn_on_mons_with_no_ac: usize,
     bluetooth_low_pct: u8,
+    state_notif_enabled: bool,
+    sleep_pct_notif_timeout: i32,
+    low_pct_notif_timeout: i32,
+    state_notif_timeout: i32,
+    warn_on_mons_with_no_ac_notif_timeout: i32,
+    bluetooth_low_pct_notif_timeout: i32,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             sleep_command: "systemctl suspend".to_string(),
-            interval_secs: 30,
+            interval: 30000,
             sleep_pct: 15,
             low_pct: 40,
             warn_on_mons_with_no_ac: 2,
             bluetooth_low_pct: 40,
+            state_notif_enabled: true,
+            sleep_pct_notif_timeout: 0,
+            low_pct_notif_timeout: 0,
+            state_notif_timeout: -1,
+            warn_on_mons_with_no_ac_notif_timeout: 0,
+            bluetooth_low_pct_notif_timeout: 0,
         }
     }
 }
@@ -50,7 +62,7 @@ fn run_sleep_command(cmd: &str) {
 
 fn main() -> Result<()> {
     let cfg: Config = confy::load("battery-notify", "config")?;
-    let interval = Duration::from_secs(cfg.interval_secs);
+    let interval = Duration::from_millis(cfg.interval);
     let mut state_notif = SingleNotification::default();
     let mut low_notif = SingleNotification::default();
     let mut mon_notif = SingleNotification::default();
@@ -100,27 +112,38 @@ fn main() -> Result<()> {
 
         let global = system::get_global_battery(&batteries);
         info!("Global status: {:?}", &global);
-        state_notif.show(
-            format!(
-                "Battery now {}",
-                system::battery_state_to_name(global.state).to_lowercase()
-            ),
-            Urgency::Normal,
-        );
+        if cfg.state_notif_enabled {
+            state_notif.show(
+                format!(
+                    "Battery now {}",
+                    system::battery_state_to_name(global.state).to_lowercase()
+                ),
+                Urgency::Normal,
+                cfg.state_notif_timeout,
+            );
+        }
 
         let level = global.level();
 
         if global.state == system::BatteryState::Charging || level > cfg.low_pct {
             low_notif.close();
         } else if level <= cfg.sleep_pct {
-            low_notif.show("Battery critical".to_string(), Urgency::Critical);
+            low_notif.show(
+                "Battery critical".to_string(),
+                Urgency::Critical,
+                cfg.sleep_pct_notif_timeout,
+            );
             // Just in case we've gone loco, don't do this more than once a minute
             if start > next_sleep_epoch {
                 next_sleep_epoch = start + sleep_backoff;
                 run_sleep_command(&cfg.sleep_command);
             }
         } else if level <= cfg.low_pct {
-            low_notif.show("Battery low".to_string(), Urgency::Critical);
+            low_notif.show(
+                "Battery low".to_string(),
+                Urgency::Critical,
+                cfg.low_pct_notif_timeout,
+            );
         }
 
         if cfg.warn_on_mons_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
@@ -133,6 +156,7 @@ fn main() -> Result<()> {
                 mon_notif.show(
                     format!("Connected to {} monitors but not AC", conn),
                     Urgency::Critical,
+                    cfg.warn_on_mons_with_no_ac_notif_timeout,
                 );
             } else {
                 mon_notif.close()
@@ -153,7 +177,11 @@ fn main() -> Result<()> {
                     .from_key(&bbat.name)
                     .or_insert_with(|| (bbat.name.clone(), SingleNotification::default()));
                 if bbat.level <= cfg.bluetooth_low_pct {
-                    notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
+                    notif.show(
+                        format!("{} battery low", bbat.name),
+                        Urgency::Critical,
+                        cfg.bluetooth_low_pct_notif_timeout,
+                    );
                 } else {
                     notif.close();
                 }

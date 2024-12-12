@@ -42,13 +42,13 @@ on first run, this will be populated with a basic config if it doesn't exist.
 The default config is:
 
 ```toml
-# How often to check battery status, in seconds.
-interval_secs = 30
+# How often to check battery status, in milliseconds.
+interval = 30000
 
-# At what percentage of battery capacity to notify about low battery.
+# At what percentage of battery capacity to notify about low battery, set to 0 to disable.
 low_pct = 40
 
-# At what percentage of battery capacity to notify and run sleep_command.
+# At what percentage of battery capacity to notify and run sleep_command, set to 0 to disable.
 sleep_pct = 15
 
 # The command to run when sleeping. Bear in mind that if you run as an
@@ -69,6 +69,18 @@ warn_on_mons_with_no_ac = 2
 #
 # Set to 0 to disable.
 bluetooth_low_pct = 40
+
+# Set to false to disable state change notifications e.g. when charging, discharging, reaching the threshold
+state_notif_enabled = true
+
+# Positive values: Expiry time for the respective notification in milliseconds. 
+# 0:  Do not expire, user will have to close the notification manually.
+# Negative values: Expire according to server default.
+sleep_pct_notif_timeout = 0
+low_pct_notif_timeout = 0
+state_notif_timeout = -1
+warn_on_mons_with_no_ac_notif_timeout = 0
+bluetooth_low_pct_notif_timeout = 0
 ```
 
 ## Output
