@@ -51,10 +51,23 @@ low_pct = 40
 # At what percentage of battery capacity to notify and run sleep_command, set to 0 to disable.
 sleep_pct = 15
 
+# Custom commands to run on battery state change.
+#
+# These commands and the sleep_command that follows are run like this: 
+# $SHELL -c <your-command>
+#
+# Using "true" like this is a no-op for most shells and the default.
+battery_state_charging_command = "true"
+battery_state_discharging_command = "true"
+battery_state_not_charging_command = "true"
+battery_state_full_command = "true"
+battery_state_unknown_command = "true"
+battery_state_at_threshold_command = "true"
+
 # The command to run when sleeping. Bear in mind that if you run as an
 # unprivileged user, you may need to consider elevation, either with NOPASSWD
 # or things like polkit.
-sleep_command = 'systemctl suspend'
+sleep_command = "systemctl suspend"
 
 # If this many monitors are connected (that is, plugged in -- they can be off)
 # and we are discharging, show a warning. Intended to avoid cases where power

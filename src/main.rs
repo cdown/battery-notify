@@ -4,6 +4,7 @@ use log::{error, info};
 use notify_rust::Urgency;
 use serde::{Deserialize, Serialize};
 
+use std::env;
 use std::io;
 
 use std::process::Command;
@@ -22,6 +23,12 @@ use notification::SingleNotification;
 #[serde(default)]
 struct Config {
     sleep_command: String,
+    battery_state_charging_command: String,
+    battery_state_discharging_command: String,
+    battery_state_not_charging_command: String,
+    battery_state_full_command: String,
+    battery_state_unknown_command: String,
+    battery_state_at_threshold_command: String,
     interval: u64,
     sleep_pct: u8,
     low_pct: u8,
@@ -39,6 +46,12 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             sleep_command: "systemctl suspend".to_string(),
+            battery_state_charging_command: "true".to_string(),
+            battery_state_discharging_command: "true".to_string(),
+            battery_state_not_charging_command: "true".to_string(),
+            battery_state_full_command: "true".to_string(),
+            battery_state_unknown_command: "true".to_string(),
+            battery_state_at_threshold_command: "true".to_string(),
             interval: 30000,
             sleep_pct: 15,
             low_pct: 40,
@@ -54,15 +67,19 @@ impl Default for Config {
     }
 }
 
-fn run_sleep_command(cmd: &str) {
-    if let Err(err) = Command::new("sh").args(["-c", cmd]).status() {
-        error!("Failed to run sleep command '{cmd}': {err}");
+fn run_command(cmd: &str) {
+    let shell = env::var("SHELL").unwrap_or("sh".to_string());
+
+    // all the major shells including sh, bash, zsh, ksh, dash, fish seem to support the -c option
+    if let Err(err) = Command::new(shell).args(["-c", cmd]).status() {
+        error!("Failed to run command '{cmd}': {err}");
     }
 }
 
 fn main() -> Result<()> {
     let cfg: Config = confy::load("battery-notify", "config")?;
     let interval = Duration::from_millis(cfg.interval);
+    let mut last_battery_state_name = String::default();
     let mut state_notif = SingleNotification::default();
     let mut low_notif = SingleNotification::default();
     let mut mon_notif = SingleNotification::default();
@@ -111,13 +128,26 @@ fn main() -> Result<()> {
         info!("Battery status: {:?}", &batteries);
 
         let global = system::get_global_battery(&batteries);
+        let battery_state_name = system::battery_state_to_name(global.state);
+
+        if battery_state_name != last_battery_state_name {
+            last_battery_state_name = battery_state_name.clone();
+
+            match battery_state_name.as_str() {
+                "Charging" => run_command(&cfg.battery_state_charging_command),
+                "Discharging" => run_command(&cfg.battery_state_discharging_command),
+                "Not charging" => run_command(&cfg.battery_state_not_charging_command),
+                "Full" => run_command(&cfg.battery_state_full_command),
+                "Unknown" => run_command(&cfg.battery_state_unknown_command),
+                "At threshold" => run_command(&cfg.battery_state_at_threshold_command),
+                _ => {}
+            }
+        }
+
         info!("Global status: {:?}", &global);
         if cfg.state_notif_enabled {
             state_notif.show(
-                format!(
-                    "Battery now {}",
-                    system::battery_state_to_name(global.state).to_lowercase()
-                ),
+                format!("Battery now {}", battery_state_name.to_lowercase()),
                 Urgency::Normal,
                 cfg.state_notif_timeout,
             );
@@ -136,7 +166,7 @@ fn main() -> Result<()> {
             // Just in case we've gone loco, don't do this more than once a minute
             if start > next_sleep_epoch {
                 next_sleep_epoch = start + sleep_backoff;
-                run_sleep_command(&cfg.sleep_command);
+                run_command(&cfg.sleep_command);
             }
         } else if level <= cfg.low_pct {
             low_notif.show(
