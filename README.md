@@ -51,31 +51,6 @@ low_pct = 40
 # At what percentage of battery capacity to notify and run sleep_command, set to 0 to disable.
 sleep_pct = 15
 
-# Custom commands to run on battery state change.
-#
-# These commands and the sleep_command that follows are run like this: 
-# $SHELL -c <your-command>
-#
-# Using "true" like this is a no-op for most shells and the default.
-battery_state_charging_command = "true"
-battery_state_discharging_command = "true"
-battery_state_not_charging_command = "true"
-battery_state_full_command = "true"
-battery_state_unknown_command = "true"
-battery_state_at_threshold_command = "true"
-
-# The command to run when sleeping. Bear in mind that if you run as an
-# unprivileged user, you may need to consider elevation, either with NOPASSWD
-# or things like polkit.
-sleep_command = "systemctl suspend"
-
-# If this many monitors are connected (that is, plugged in -- they can be off)
-# and we are discharging, show a warning. Intended to avoid cases where power
-# is inadvertently disconnected at a desk.
-#
-# Set to 0 to disable.
-warn_on_mons_with_no_ac = 2
-
 # If a bluetooth device is below this percentage, notify about low battery.
 # Note that you need to run bluetoothd with --experimental in order for it to
 # expose battery information.
@@ -83,17 +58,42 @@ warn_on_mons_with_no_ac = 2
 # Set to 0 to disable.
 bluetooth_low_pct = 40
 
-# Set to false to disable state change notifications e.g. when charging, discharging, reaching the threshold
-state_notif_enabled = true
+# If this many monitors are connected (that is, plugged in -- they can be off)
+# and we are discharging, show a warning. Intended to avoid cases where power
+# is inadvertently disconnected at a desk.
+#
+# Set to 0 to disable.
+monitors_with_no_ac = 2
 
-# Positive values: Expiry time for the respective notification in milliseconds. 
-# 0:  Do not expire, user will have to close the notification manually.
-# Negative values: Expire according to server default.
-sleep_pct_notif_timeout = 0
-low_pct_notif_timeout = 0
-state_notif_timeout = -1
-warn_on_mons_with_no_ac_notif_timeout = 0
-bluetooth_low_pct_notif_timeout = 0
+# Custom commands to be run once per battery state change. Ran with $SHELL -c.
+[events]
+low = ""
+sleep = "systemctl suspend"
+charging = ""
+discharging = ""
+not_charging = ""
+full = ""
+unknown = ""
+at_threshold = ""
+
+# Set an expiry timeout for notifications or disable them.
+#
+# Allowed values:
+#   persistent: The notification will never expire
+#   server-default: Use your notification server's default timeout
+#   disabled: Disables the particular notification
+#   non-zero positive integers: Timeout in milliseconds
+[notifications]
+low = "persistent"
+sleep = "persistent"
+bluetooth_low = "persistent"
+monitors_with_no_ac = "persistent"
+charging = "server-default"
+discharging = "server-default"
+not_charging = "persistent"
+full = "persistent"
+unknown = "persistent"
+at_threshold = "persistent"
 ```
 
 ## Output
