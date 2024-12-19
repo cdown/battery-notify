@@ -1,5 +1,5 @@
 use log::{error, trace};
-use notify_rust::{Notification, NotificationHandle, Urgency};
+use notify_rust::{Notification, NotificationHandle, Timeout, Urgency};
 
 #[derive(Default)]
 pub struct SingleNotification {
@@ -8,13 +8,14 @@ pub struct SingleNotification {
 }
 
 impl SingleNotification {
-    pub fn show(&mut self, summary: String, urgency: Urgency) {
+    pub fn show(&mut self, summary: String, urgency: Urgency, timeout: i32) {
         if self.summary.as_ref() != Some(&summary) {
             self.close();
             trace!("Creating notification for {}", summary);
             self.hnd = Notification::default()
                 .summary(&summary)
                 .urgency(urgency)
+                .timeout(Timeout::from(timeout))
                 .show()
                 .map_err(|err| error!("error showing notification: {err}"))
                 .ok();

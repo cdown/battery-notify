@@ -42,26 +42,14 @@ on first run, this will be populated with a basic config if it doesn't exist.
 The default config is:
 
 ```toml
-# How often to check battery status, in seconds.
-interval_secs = 30
+# How often to check battery status, in milliseconds.
+interval = 30000
 
-# At what percentage of battery capacity to notify about low battery.
+# At what percentage of battery capacity to notify about low battery, set to 0 to disable.
 low_pct = 40
 
-# At what percentage of battery capacity to notify and run sleep_command.
+# At what percentage of battery capacity to notify and run sleep_command, set to 0 to disable.
 sleep_pct = 15
-
-# The command to run when sleeping. Bear in mind that if you run as an
-# unprivileged user, you may need to consider elevation, either with NOPASSWD
-# or things like polkit.
-sleep_command = 'systemctl suspend'
-
-# If this many monitors are connected (that is, plugged in -- they can be off)
-# and we are discharging, show a warning. Intended to avoid cases where power
-# is inadvertently disconnected at a desk.
-#
-# Set to 0 to disable.
-warn_on_mons_with_no_ac = 2
 
 # If a bluetooth device is below this percentage, notify about low battery.
 # Note that you need to run bluetoothd with --experimental in order for it to
@@ -69,6 +57,43 @@ warn_on_mons_with_no_ac = 2
 #
 # Set to 0 to disable.
 bluetooth_low_pct = 40
+
+# If this many monitors are connected (that is, plugged in -- they can be off)
+# and we are discharging, show a warning. Intended to avoid cases where power
+# is inadvertently disconnected at a desk.
+#
+# Set to 0 to disable.
+monitors_with_no_ac = 2
+
+# Custom commands to be run once per battery state change. Ran with $SHELL -c.
+[events]
+low = ""
+sleep = "systemctl suspend"
+charging = ""
+discharging = ""
+not_charging = ""
+full = ""
+unknown = ""
+at_threshold = ""
+
+# Set an expiry timeout for notifications or disable them.
+#
+# Allowed values:
+#   persistent: The notification will never expire
+#   server-default: Use your notification server's default timeout
+#   disabled: Disables the particular notification
+#   non-zero positive integers: Timeout in milliseconds
+[notifications]
+low = "persistent"
+sleep = "persistent"
+bluetooth_low = "persistent"
+monitors_with_no_ac = "persistent"
+charging = "server-default"
+discharging = "server-default"
+not_charging = "persistent"
+full = "persistent"
+unknown = "persistent"
+at_threshold = "persistent"
 ```
 
 ## Output
