@@ -16,7 +16,7 @@ anyhow = "1.0.93"
 cancellable-timer = "0.1.0"
 confy = "0.6.1"
 ctrlc = { version = "3.4.5", features = ["termination"] }
-env_logger = { version = "0.11.5", features = ["humantime"], default-features = false }
+env_logger = { version = "0.11.6", features = ["humantime"], default-features = false }
 hashbrown = "0.15.1"
 log = "0.4.22"
 notify-rust = "4.11.3"
