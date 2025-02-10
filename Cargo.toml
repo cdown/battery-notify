@@ -25,7 +25,7 @@ sd-notify = "0.4.3"
 serde = { version = "1.0.215", default-features = false }
 serde_plain = "1.0.2"
 x11rb = { version = "0.13.1", features = ["randr"], optional = true, default-features = false }
-zbus = { version = "5.1.1", features = ["async-io", "blocking-api"], optional = true, default-features = false }
+zbus = { version = "5.5.0", features = ["async-io", "blocking-api"], optional = true, default-features = false }
 
 [features]
 default = ["mons", "bluetooth"]
