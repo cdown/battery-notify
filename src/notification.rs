@@ -40,7 +40,6 @@ impl Drop for SingleNotification {
 }
 
 /// A `SingleNotification` pre-configured with a fixed summary, urgency, and timeout.
-#[allow(dead_code)]
 pub struct ConfiguredNotification {
     inner: SingleNotification,
     summary: String,
@@ -48,7 +47,6 @@ pub struct ConfiguredNotification {
     timeout: i32,
 }
 
-#[allow(dead_code)]
 impl ConfiguredNotification {
     pub fn new(summary: impl Into<String>, urgency: Urgency, timeout: i32) -> Self {
         Self {
