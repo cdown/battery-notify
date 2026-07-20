@@ -167,6 +167,7 @@ fn main() -> Result<()> {
             run_low_command = true;
         } else if level <= cfg.sleep_pct {
             low_notif.close();
+
             if cfg.notifications.sleep != config::Notification::Disabled {
                 sleep_notif.show();
             }
