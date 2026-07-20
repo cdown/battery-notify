@@ -84,6 +84,7 @@ fn main() -> Result<()> {
                 system::battery_state_to_name(global.state).to_lowercase()
             ),
             Urgency::Normal,
+            -1,
         );
 
         let level = global.level();
@@ -91,14 +92,14 @@ fn main() -> Result<()> {
         if global.state == system::BatteryState::Charging || level > cfg.low_pct {
             low_notif.close();
         } else if level <= cfg.sleep_pct {
-            low_notif.show("Battery critical".to_string(), Urgency::Critical);
+            low_notif.show("Battery critical".to_string(), Urgency::Critical, -1);
             // Just in case we've gone loco, don't do this more than once a minute
             if start > next_sleep_epoch {
                 next_sleep_epoch = start + sleep_backoff;
                 run_sleep_command(&cfg.sleep_command);
             }
         } else if level <= cfg.low_pct {
-            low_notif.show("Battery low".to_string(), Urgency::Critical);
+            low_notif.show("Battery low".to_string(), Urgency::Critical, -1);
         }
 
         if monitors_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
@@ -111,6 +112,7 @@ fn main() -> Result<()> {
                 mon_notif.show(
                     format!("Connected to {} monitors but not AC", conn),
                     Urgency::Critical,
+                    -1,
                 );
             } else {
                 mon_notif.close()
@@ -131,7 +133,7 @@ fn main() -> Result<()> {
                     .from_key(&bbat.name)
                     .or_insert_with(|| (bbat.name.clone(), SingleNotification::default()));
                 if bbat.level <= cfg.bluetooth_low_pct {
-                    notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
+                    notif.show(format!("{} battery low", bbat.name), Urgency::Critical, -1);
                 } else {
                     notif.close();
                 }
