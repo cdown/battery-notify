@@ -25,8 +25,10 @@ fn run_sleep_command(cmd: &str) {
 }
 
 fn main() -> Result<()> {
-    let cfg: config::Config = confy::load("battery-notify", "config")?;
-    let interval = Duration::from_secs(cfg.interval_secs);
+    let mut cfg: config::Config = confy::load("battery-notify", "config")?;
+    log::debug!("{cfg:?}");
+
+    let (interval, monitors_with_no_ac) = cfg.validate()?;
     let mut state_notif = SingleNotification::default();
     let mut low_notif = SingleNotification::default();
     let mut mon_notif = SingleNotification::default();
@@ -99,13 +101,13 @@ fn main() -> Result<()> {
             low_notif.show("Battery low".to_string(), Urgency::Critical);
         }
 
-        if cfg.warn_on_mons_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
+        if monitors_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
             let conn = monitors::get_nr_connected().unwrap_or_else(|err| {
                 error!("{err}");
                 0
             });
             info!("Current connected monitors: {conn}");
-            if conn >= cfg.warn_on_mons_with_no_ac {
+            if conn >= monitors_with_no_ac {
                 mon_notif.show(
                     format!("Connected to {} monitors but not AC", conn),
                     Urgency::Critical,
