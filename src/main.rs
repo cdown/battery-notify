@@ -2,8 +2,8 @@ use anyhow::{bail, Context, Result};
 use hashbrown::HashMap;
 use log::{error, info};
 use notify_rust::Urgency;
-use serde::{Deserialize, Serialize};
 
+use std::env;
 use std::io;
 
 use std::process::Command;
@@ -12,54 +12,94 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod bluetooth;
+mod config;
 mod monitors;
 mod notification;
 mod system;
 
-use notification::SingleNotification;
+use notification::{ConfiguredNotification, SingleNotification};
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-struct Config {
-    sleep_command: String,
-    interval_secs: u64,
-    sleep_pct: u8,
-    low_pct: u8,
-    warn_on_mons_with_no_ac: usize,
-    bluetooth_low_pct: u8,
-}
+fn run_command(cmd: Option<&str>) {
+    let cmd = match cmd {
+        Some(c) if !c.is_empty() => c,
+        _ => return,
+    };
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            sleep_command: "systemctl suspend".to_string(),
-            interval_secs: 30,
-            sleep_pct: 15,
-            low_pct: 40,
-            warn_on_mons_with_no_ac: 2,
-            bluetooth_low_pct: 40,
-        }
+    let shell = env::var("SHELL").unwrap_or_else(|_| "sh".to_string());
+
+    if let Err(err) = Command::new(shell).args(["-c", cmd]).status() {
+        error!("Failed to run command '{cmd}': {err}");
     }
 }
 
-fn run_sleep_command(cmd: &str) {
-    if let Err(err) = Command::new("sh").args(["-c", cmd]).status() {
-        error!("Failed to run sleep command '{cmd}': {err}");
+fn handle_state_change(
+    state: system::BatteryState,
+    cfg: &config::Config,
+    state_notif: &mut SingleNotification,
+) {
+    let (notif_cfg, event_cmd) = match state {
+        system::BatteryState::Charging => {
+            (&cfg.notifications.charging, cfg.events.charging.as_deref())
+        }
+        system::BatteryState::Discharging => (
+            &cfg.notifications.discharging,
+            cfg.events.discharging.as_deref(),
+        ),
+        system::BatteryState::NotCharging => (
+            &cfg.notifications.not_charging,
+            cfg.events.not_charging.as_deref(),
+        ),
+        system::BatteryState::Full => (&cfg.notifications.full, cfg.events.full.as_deref()),
+        system::BatteryState::Unknown => {
+            (&cfg.notifications.unknown, cfg.events.unknown.as_deref())
+        }
+        system::BatteryState::AtThreshold => (
+            &cfg.notifications.at_threshold,
+            cfg.events.at_threshold.as_deref(),
+        ),
+        system::BatteryState::Invalid => return,
+    };
+
+    run_command(event_cmd);
+
+    if *notif_cfg != config::Notification::Disabled {
+        state_notif.show(
+            format!(
+                "Battery now {}",
+                system::battery_state_to_name(state).to_lowercase()
+            ),
+            Urgency::Normal,
+            notif_cfg.to_i32(),
+        );
     }
 }
 
 fn main() -> Result<()> {
-    let cfg: Config = confy::load("battery-notify", "config")?;
-    let interval = Duration::from_secs(cfg.interval_secs);
+    let mut cfg: config::Config = confy::load("battery-notify", "config")?;
+    log::debug!("{cfg:?}");
+
+    let (interval, monitors_with_no_ac) = cfg.validate()?;
+
+    let mut last_global_state = system::BatteryState::Invalid;
+    let mut run_low_command = true;
     let mut state_notif = SingleNotification::default();
-    let mut low_notif = SingleNotification::default();
+    let mut low_notif = ConfiguredNotification::new(
+        "Battery low",
+        Urgency::Critical,
+        cfg.notifications.low.to_i32(),
+    );
+    let mut sleep_notif = ConfiguredNotification::new(
+        "Battery critical",
+        Urgency::Critical,
+        cfg.notifications.sleep.to_i32(),
+    );
     let mut mon_notif = SingleNotification::default();
+    let mut bluetooth_bat_notifs = HashMap::new();
     let sleep_backoff = Duration::from_secs(60);
     let mut next_sleep_epoch = Instant::now();
     let should_term = Arc::new(AtomicBool::new(false));
     let st_for_hnd = should_term.clone();
     let (mut timer, canceller) = cancellable_timer::Timer::new2()?;
-    let mut bbat_notifs = HashMap::new();
 
     env_logger::init_from_env(env_logger::Env::default().default_filter_or("info"));
 
@@ -100,40 +140,69 @@ fn main() -> Result<()> {
 
         let global = system::get_global_battery(&batteries);
         info!("Global status: {:?}", &global);
-        state_notif.show(
-            format!(
-                "Battery now {}",
-                system::battery_state_to_name(global.state).to_lowercase()
-            ),
-            Urgency::Normal,
-        );
+
+        if global.state != last_global_state {
+            match global.state {
+                system::BatteryState::Charging
+                | system::BatteryState::Discharging
+                | system::BatteryState::NotCharging
+                | system::BatteryState::Full
+                | system::BatteryState::Unknown
+                | system::BatteryState::AtThreshold => {
+                    handle_state_change(global.state, &cfg, &mut state_notif);
+                }
+                system::BatteryState::Invalid => {
+                    // Initial state — nothing to do
+                }
+            }
+
+            last_global_state = global.state;
+        }
 
         let level = global.level();
 
         if global.state == system::BatteryState::Charging || level > cfg.low_pct {
             low_notif.close();
+            sleep_notif.close();
+            run_low_command = true;
         } else if level <= cfg.sleep_pct {
-            low_notif.show("Battery critical".to_string(), Urgency::Critical);
+            low_notif.close();
+
+            if cfg.notifications.sleep != config::Notification::Disabled {
+                sleep_notif.show();
+            }
             // Just in case we've gone loco, don't do this more than once a minute
             if start > next_sleep_epoch {
                 next_sleep_epoch = start + sleep_backoff;
-                run_sleep_command(&cfg.sleep_command);
+                run_command(cfg.events.sleep.as_deref());
             }
         } else if level <= cfg.low_pct {
-            low_notif.show("Battery low".to_string(), Urgency::Critical);
+            sleep_notif.close();
+
+            if cfg.notifications.low != config::Notification::Disabled {
+                low_notif.show();
+            }
+
+            if run_low_command {
+                run_command(cfg.events.low.as_deref());
+                run_low_command = false;
+            }
         }
 
-        if cfg.warn_on_mons_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
+        if monitors_with_no_ac > 0 && global.state == system::BatteryState::Discharging {
             let conn = monitors::get_nr_connected().unwrap_or_else(|err| {
                 error!("{err}");
                 0
             });
             info!("Current connected monitors: {conn}");
-            if conn >= cfg.warn_on_mons_with_no_ac {
-                mon_notif.show(
-                    format!("Connected to {} monitors but not AC", conn),
-                    Urgency::Critical,
-                );
+            if conn >= monitors_with_no_ac {
+                if cfg.notifications.monitors_with_no_ac != config::Notification::Disabled {
+                    mon_notif.show(
+                        format!("Connected to {} monitors but not AC", conn),
+                        Urgency::Critical,
+                        cfg.notifications.monitors_with_no_ac.to_i32(),
+                    );
+                }
             } else {
                 mon_notif.close()
             }
@@ -148,19 +217,25 @@ fn main() -> Result<()> {
             });
             info!("Bluetooth battery status: {:?}", bbats);
             for bbat in &bbats {
-                let (_, notif) = bbat_notifs
+                let (_, notif) = bluetooth_bat_notifs
                     .raw_entry_mut()
                     .from_key(&bbat.name)
                     .or_insert_with(|| (bbat.name.clone(), SingleNotification::default()));
                 if bbat.level <= cfg.bluetooth_low_pct {
-                    notif.show(format!("{} battery low", bbat.name), Urgency::Critical);
+                    if cfg.notifications.bluetooth_low != config::Notification::Disabled {
+                        notif.show(
+                            format!("{} battery low", bbat.name),
+                            Urgency::Critical,
+                            cfg.notifications.bluetooth_low.to_i32(),
+                        );
+                    }
                 } else {
                     notif.close();
                 }
             }
 
             // Get rid of any non-present devices and close the notification through Drop
-            bbat_notifs.retain(|key, _| bbats.iter().any(|b| b.name == *key));
+            bluetooth_bat_notifs.retain(|key, _| bbats.iter().any(|b| b.name == *key));
         }
 
         let now = Instant::now();

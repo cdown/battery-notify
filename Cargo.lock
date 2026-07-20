@@ -179,6 +179,7 @@ dependencies = [
  "ctrlc",
  "env_logger",
  "hashbrown",
+ "humantime",
  "log",
  "notify-rust",
  "once_cell",
