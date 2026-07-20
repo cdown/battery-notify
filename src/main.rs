@@ -2,7 +2,6 @@ use anyhow::{bail, Context, Result};
 use hashbrown::HashMap;
 use log::{error, info};
 use notify_rust::Urgency;
-use serde::{Deserialize, Serialize};
 
 use std::io;
 
@@ -12,35 +11,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 mod bluetooth;
+mod config;
 mod monitors;
 mod notification;
 mod system;
 
 use notification::SingleNotification;
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-struct Config {
-    sleep_command: String,
-    interval_secs: u64,
-    sleep_pct: u8,
-    low_pct: u8,
-    warn_on_mons_with_no_ac: usize,
-    bluetooth_low_pct: u8,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            sleep_command: "systemctl suspend".to_string(),
-            interval_secs: 30,
-            sleep_pct: 15,
-            low_pct: 40,
-            warn_on_mons_with_no_ac: 2,
-            bluetooth_low_pct: 40,
-        }
-    }
-}
 
 fn run_sleep_command(cmd: &str) {
     if let Err(err) = Command::new("sh").args(["-c", cmd]).status() {
@@ -49,7 +25,7 @@ fn run_sleep_command(cmd: &str) {
 }
 
 fn main() -> Result<()> {
-    let cfg: Config = confy::load("battery-notify", "config")?;
+    let cfg: config::Config = confy::load("battery-notify", "config")?;
     let interval = Duration::from_secs(cfg.interval_secs);
     let mut state_notif = SingleNotification::default();
     let mut low_notif = SingleNotification::default();
